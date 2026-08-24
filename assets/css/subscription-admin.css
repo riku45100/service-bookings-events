@@ -1,0 +1,74 @@
+/* Subscription Admin Styles */
+.sbe-subscription-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 20px 0; }
+.sbe-subscription-stats > div { background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04); }
+.sbe-subscription-stats h3 { margin: 0; color: #666; font-size: 14px; font-weight: 600; text-transform: uppercase; }
+.sbe-subscription-stats p { font-size: 2em; margin: 10px 0; font-weight: 300; }
+.sbe-sub-status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.sbe-status-active { background: #d4edda; color: #155724; }
+.sbe-status-trialing { background: #d1ecf1; color: #0c5460; }
+.sbe-status-past_due { background: #fff3cd; color: #856404; }
+.sbe-status-canceled { background: #f8d7da; color: #721c24; }
+.sbe-status-expired { background: #e2e3e5; color: #383d41; }
+.sbe-subscriptions-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #ccd0d4; margin-top: 20px; }
+.sbe-subscriptions-table thead { background: #f9f9f9; }
+.sbe-subscriptions-table th, .sbe-subscriptions-table td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+.sbe-subscriptions-table th { font-weight: 600; color: #333; }
+.sbe-subscriptions-table tr:hover { background: #f9f9f9; }
+.sbe-subscriptions-table .sbe-cancel-sub-btn { background: #dc3545; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: background 0.3s ease; }
+.sbe-subscriptions-table .sbe-cancel-sub-btn:hover { background: #c82333; }
+#sbe_plan_details .form-table th { padding: 15px 10px 15px 0; width: 200px; font-weight: 600; }
+#sbe_plan_details .form-table td { padding: 15px 10px; }
+#sbe_plan_details input[type="number"], #sbe_plan_details select { width: 100%; max-width: 300px; }
+#sbe-plan-features-container { margin-bottom: 15px; }
+.sbe-feature-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.sbe-feature-row input[type="text"] { flex: 1; }
+#sbe-add-feature { margin-top: 10px; }
+#sbe_plan_gateway_ids p { margin-bottom: 15px; }
+#sbe_plan_gateway_ids input[type="text"] { width: 100%; }
+#sbe-sync-gateway-plans { background: #0073aa; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; transition: background 0.3s ease; }
+#sbe-sync-gateway-plans:hover { background: #005a87; }
+.sbe-sync-status { margin-left: 10px; font-size: 13px; }
+.sbe-sync-status.success { color: #28a745; }
+.sbe-sync-status.error { color: #dc3545; }
+.sbe-pricing-table { margin: 40px 0; padding: 20px; }
+.sbe-plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; margin-top: 30px; }
+.sbe-plan-card { background: #fff; border: 2px solid #e0e0e0; border-radius: 8px; padding: 30px; text-align: center; transition: all 0.3s ease; position: relative; overflow: hidden; }
+.sbe-plan-card:hover { border-color: #0073aa; box-shadow: 0 5px 20px rgba(0, 115, 170, 0.15); transform: translateY(-5px); }
+.sbe-plan-card.featured { border-color: #0073aa; background: #f0f8ff; }
+.sbe-plan-card.featured::before { content: 'Popular'; position: absolute; top: 15px; right: -30px; background: #0073aa; color: #fff; padding: 5px 40px; font-size: 12px; font-weight: 600; transform: rotate(45deg); }
+.sbe-plan-card h3 { margin: 0 0 20px; font-size: 1.5em; color: #333; }
+.sbe-plan-price { margin: 20px 0; padding: 20px 0; border-top: 2px solid #e0e0e0; border-bottom: 2px solid #e0e0e0; }
+.sbe-plan-amount { font-size: 3em; font-weight: 700; color: #0073aa; }
+.sbe-plan-currency { font-size: 1.5em; color: #666; vertical-align: super; }
+.sbe-plan-interval { font-size: 1em; color: #666; margin-left: 5px; }
+.sbe-plan-trial { color: #28a745; font-weight: 600; margin: 10px 0; font-size: 0.9em; }
+.sbe-plan-features { margin: 20px 0; text-align: left; }
+.sbe-plan-features ul { list-style: none; padding: 0; margin: 0; }
+.sbe-plan-features li { padding: 8px 0; border-bottom: 1px solid #f0f0f0; color: #666; }
+.sbe-plan-features li:last-child { border-bottom: none; }
+.sbe-plan-features li::before { content: '✓'; color: #28a745; font-weight: bold; margin-right: 10px; }
+.sbe-plan-select-btn { display: inline-block; background: #0073aa; color: #fff; padding: 12px 30px; border-radius: 4px; text-decoration: none; font-weight: 600; transition: background 0.3s ease; margin-top: 20px; }
+.sbe-plan-select-btn:hover { background: #005a87; color: #fff; }
+.sbe-subscription-form { max-width: 500px; margin: 40px auto; padding: 30px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+.sbe-subscription-form .sbe-form-group { margin-bottom: 20px; }
+.sbe-subscription-form label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+.sbe-subscription-form input[type="email"], .sbe-subscription-form input[type="text"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 15px; }
+.sbe-subscription-form input[type="checkbox"], .sbe-subscription-form input[type="radio"] { margin-right: 8px; }
+.sbe-payment-methods { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 4px; }
+.sbe-payment-methods label { display: block; margin-bottom: 10px; cursor: pointer; }
+.sbe-payment-methods label:last-child { margin-bottom: 0; }
+.sbe-subscribe-btn { width: 100%; background: #0073aa; color: #fff; padding: 15px; border: none; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.3s ease; }
+.sbe-subscribe-btn:hover { background: #005a87; }
+.sbe-subscription-message { margin-top: 15px; padding: 12px; border-radius: 4px; display: none; }
+.sbe-subscription-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+.sbe-subscription-message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+.sbe-manage-subscriptions { max-width: 1000px; margin: 40px auto; padding: 30px; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; }
+.sbe-manage-subscriptions h2 { margin: 0 0 30px; padding-bottom: 15px; border-bottom: 2px solid #0073aa; }
+@media (max-width: 1024px) {
+    .sbe-subscription-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .sbe-subscription-stats { grid-template-columns: 1fr; }
+    .sbe-plans-grid { grid-template-columns: 1fr; }
+    .sbe-subscription-form { margin: 20px; padding: 20px; }
+}

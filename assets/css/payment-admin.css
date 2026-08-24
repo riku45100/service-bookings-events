@@ -1,0 +1,44 @@
+/* Payment Admin Styles */
+.sbe-payment-settings { max-width: 1200px; }
+.sbe-settings-sections { margin-top: 20px; }
+.sbe-settings-section { background: #fff; padding: 25px; margin-bottom: 30px; border: 1px solid #ccd0d4; border-radius: 4px; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04); }
+.sbe-settings-section h2 { margin: 0 0 15px; padding-bottom: 10px; border-bottom: 2px solid #0073aa; font-size: 1.5em; }
+.sbe-settings-section h3 { margin: 20px 0 15px; font-size: 1.2em; color: #0073aa; }
+.sbe-settings-section .form-table th { padding: 20px 10px 20px 0; width: 250px; font-weight: 600; }
+.sbe-settings-section .form-table td { padding: 15px 10px; }
+.sbe-settings-section input[type="text"], .sbe-settings-section input[type="password"], .sbe-settings-section input[type="number"], .sbe-settings-section select { width: 100%; max-width: 500px; }
+.sbe-settings-section .description { font-size: 13px; color: #666; margin-top: 5px; font-style: italic; }
+.sbe-webhook-info { background: #f0f0f1; padding: 15px; border-left: 4px solid #0073aa; margin: 20px 0; }
+.sbe-webhook-info h4 { margin: 0 0 10px; color: #0073aa; }
+.sbe-webhook-info ol { margin: 0; padding-left: 20px; }
+.sbe-webhook-info li { margin-bottom: 8px; line-height: 1.5; }
+.sbe-webhook-info code { display: inline-block; background: #fff; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+.sbe-webhook-info ul { list-style: disc; margin: 5px 0 0 20px; }
+.sbe-webhook-info ul li { margin-bottom: 4px; }
+.sbe-payment-status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+.sbe-status-paid { background: #d4edda; color: #155724; }
+.sbe-status-pending { background: #fff3cd; color: #856404; }
+.sbe-status-failed { background: #f8d7da; color: #721c24; }
+.sbe-status-refunded { background: #d1ecf1; color: #0c5460; }
+.sbe-transactions-log { margin-top: 40px; background: #fff; padding: 25px; border: 1px solid #ccd0d4; border-radius: 4px; }
+.sbe-transactions-log h2 { margin: 0 0 20px; padding-bottom: 10px; border-bottom: 2px solid #0073aa; }
+.sbe-transactions-log .wp-list-table { margin-top: 0; }
+.sbe-transactions-log .wp-list-table th { font-weight: 600; padding: 12px 10px; }
+.sbe-transactions-log .wp-list-table td { padding: 12px 10px; vertical-align: middle; }
+.sbe-transactions-log .wp-list-table td small { color: #666; display: block; margin-top: 4px; font-size: 12px; }
+.sbe-test-mode-notice { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+.sbe-test-mode-notice p { margin: 0; color: #856404; }
+.sbe-api-key-field { position: relative; }
+.sbe-toggle-key { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #0073aa; font-size: 14px; padding: 5px; }
+.sbe-toggle-key:hover { color: #005a87; }
+.sbe-gateway-card { display: inline-block; width: 300px; margin: 10px; padding: 20px; border: 2px solid #e0e0e0; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s ease; }
+.sbe-gateway-card:hover { border-color: #0073aa; box-shadow: 0 2px 8px rgba(0, 115, 170, 0.2); }
+.sbe-gateway-card.active { border-color: #0073aa; background: #e6f7ff; }
+.sbe-gateway-card img { max-width: 150px; height: auto; margin-bottom: 15px; }
+.sbe-gateway-card h3 { margin: 0 0 10px; font-size: 1.2em; }
+.sbe-gateway-card p { color: #666; font-size: 13px; }
+@media (max-width: 782px) {
+    .sbe-settings-section .form-table th { width: auto; display: block; padding-bottom: 5px; }
+    .sbe-settings-section .form-table td { display: block; padding-top: 5px; }
+    .sbe-gateway-card { width: 100%; margin: 10px 0; }
+}

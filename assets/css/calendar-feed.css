@@ -1,0 +1,46 @@
+/* Calendar Feed Styles */
+.sbe-calendar-subscribe { margin: 30px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; border: 1px solid #e0e0e0; }
+.sbe-calendar-subscribe h3 { margin: 0 0 15px; font-size: 1.2em; color: #333; }
+.sbe-calendar-subscribe p { margin: 0 0 15px; color: #666; line-height: 1.6; }
+.sbe-cal-btn { display: inline-flex; align-items: center; padding: 10px 20px; border-radius: 4px; font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.3s ease; border: none; cursor: pointer; margin: 5px; }
+.sbe-cal-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); text-decoration: none; color: #fff; }
+.sbe-cal-ics { background: #0073aa; color: #fff; }
+.sbe-cal-ics:hover { background: #005a87; }
+.sbe-cal-google { background: #4285F4; color: #fff; }
+.sbe-cal-google:hover { background: #3367D6; }
+.sbe-cal-apple { background: #666; color: #fff; }
+.sbe-cal-apple:hover { background: #555; }
+.sbe-cal-btn span { margin-right: 5px; font-size: 16px; }
+.sbe-add-to-calendar-btn { display: inline-flex; align-items: center; padding: 10px 20px; background: #4285F4; color: #fff; border-radius: 4px; font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.3s ease; border: none; cursor: pointer; }
+.sbe-add-to-calendar-btn:hover { background: #3367D6; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3); text-decoration: none; color: #fff; }
+.sbe-add-to-calendar-btn span { margin-right: 5px; font-size: 16px; }
+.sbe-email-calendar-links { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0; }
+.sbe-email-calendar-links p { margin: 0 0 10px; font-size: 14px; color: #666; }
+.sbe-email-calendar-links a { display: inline-block; padding: 8px 16px; margin-right: 10px; margin-bottom: 10px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 600; transition: all 0.3s ease; }
+.sbe-email-calendar-links a:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
+.sbe-email-calendar-links .cal-ics { background: #0073aa; color: #fff; }
+.sbe-email-calendar-links .cal-google { background: #4285F4; color: #fff; }
+.sbe-email-calendar-links .cal-apple { background: #666; color: #fff; }
+.sbe-calendar-settings-section { margin-top: 30px; background: #fff; padding: 25px; border: 1px solid #ccd0d4; border-radius: 4px; }
+.sbe-calendar-settings-section h2 { margin: 0 0 20px; padding-bottom: 10px; border-bottom: 2px solid #0073aa; font-size: 1.5em; }
+.sbe-calendar-settings-section .form-table th { padding: 15px 10px 15px 0; width: 250px; font-weight: 600; }
+.sbe-calendar-settings-section .form-table td { padding: 15px 10px; }
+.sbe-calendar-settings-section input[type="text"], .sbe-calendar-settings-section select { width: 100%; max-width: 400px; }
+.sbe-calendar-settings-section .description { font-size: 13px; color: #666; margin-top: 5px; font-style: italic; }
+.sbe-calendar-settings-section code { display: block; background: #fff; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 3px; word-break: break-all; font-size: 12px; }
+.sbe-calendar-feed-info { margin-top: 20px; padding: 15px; background: #f0f0f1; border-left: 4px solid #0073aa; border-radius: 4px; }
+.sbe-calendar-feed-info h4 { margin: 0 0 10px; color: #0073aa; font-size: 1.1em; }
+.sbe-calendar-feed-info p { margin: 10px 0; color: #666; line-height: 1.6; }
+.sbe-calendar-feed-info strong { color: #333; display: block; margin-bottom: 5px; }
+.sbe-booking-calendar-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 4px; border: 1px solid #e0e0e0; }
+.sbe-booking-calendar-section h4 { margin: 0 0 10px; font-size: 1em; color: #333; }
+.sbe-booking-calendar-section .calendar-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 768px) {
+    .sbe-calendar-subscribe { padding: 15px; }
+    .sbe-cal-btn { width: 100%; justify-content: center; margin-bottom: 10px; }
+    .sbe-calendar-settings-section .form-table th { width: auto; display: block; padding-bottom: 5px; }
+    .sbe-calendar-settings-section .form-table td { display: block; padding-top: 5px; }
+}
+@media print {
+    .sbe-calendar-subscribe, .sbe-add-to-calendar-btn, .sbe-email-calendar-links { display: none; }
+}
