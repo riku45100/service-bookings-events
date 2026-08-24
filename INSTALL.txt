@@ -1,0 +1,38 @@
+QUICK START GUIDE
+===================
+
+1. INSTALL PLUGIN
+   - Upload service-bookings-events folder to /wp-content/plugins/
+   - Activate in WordPress Admin → Plugins
+
+2. CONFIGURE PAYMENTS (Optional)
+   - Go to Bookings & Events → Payment Gateways
+   - Enable Test Mode
+   - Enter Stripe/PayPal API keys
+   - Save settings
+
+3. CREATE SUBSCRIPTION PLANS (Optional)
+   - Go to Bookings & Events → Subscription Plans → Add New
+   - Set amount, billing interval, trial period
+   - Add features list
+   - Publish
+
+4. ENABLE CALENDAR FEEDS (Optional)
+   - Go to Settings → Calendar Subscription
+   - Enable calendar feeds
+   - Set timezone
+   - Save
+
+5. ADD TO YOUR SITE
+   - Use shortcodes on any page:
+     * [sbe_booking_form]
+     * [sbe_pricing_table]
+     * [sbe_calendar_subscribe]
+
+6. GO LIVE
+   - Disable Test Mode in Payment settings
+   - Enter live API keys
+   - Test with real payment
+   - Launch!
+
+Full documentation in .md files.
