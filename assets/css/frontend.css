@@ -1,0 +1,55 @@
+/* Service Bookings & Events - Frontend Styles */
+.sbe-booking-form { max-width: 600px; margin: 2rem 0; padding: 2rem; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.sbe-form .sbe-form-group { margin-bottom: 1.5rem; }
+.sbe-form label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+.sbe-form input[type="text"], .sbe-form input[type="email"], .sbe-form input[type="tel"], .sbe-form input[type="date"], .sbe-form select, .sbe-form textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; transition: border-color 0.3s ease; }
+.sbe-form input:focus, .sbe-form select:focus, .sbe-form textarea:focus { outline: none; border-color: #0073aa; box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.1); }
+.sbe-form textarea { resize: vertical; min-height: 100px; }
+.sbe-submit-btn { background: #0073aa; color: #fff; padding: 0.875rem 2rem; border: none; border-radius: 4px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.3s ease; }
+.sbe-submit-btn:hover { background: #005a87; }
+.sbe-submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+.sbe-message { margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none; }
+.sbe-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+.sbe-message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+.sbe-events-grid, .sbe-services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; margin-top: 2rem; }
+.sbe-event-card, .sbe-service-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.sbe-event-card:hover, .sbe-service-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); }
+.sbe-event-thumbnail, .sbe-service-thumbnail { width: 100%; height: 200px; overflow: hidden; }
+.sbe-event-thumbnail img, .sbe-service-thumbnail img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
+.sbe-event-card:hover .sbe-event-thumbnail img, .sbe-service-card:hover .sbe-service-thumbnail img { transform: scale(1.05); }
+.sbe-event-content, .sbe-service-content { padding: 1.5rem; }
+.sbe-event-title, .sbe-service-title { margin: 0 0 1rem; font-size: 1.25rem; }
+.sbe-event-title a, .sbe-service-title a { color: #333; text-decoration: none; transition: color 0.3s ease; }
+.sbe-event-title a:hover, .sbe-service-title a:hover { color: #0073aa; }
+.sbe-event-excerpt, .sbe-service-excerpt { color: #666; margin-bottom: 1rem; line-height: 1.6; }
+.sbe-event-meta, .sbe-service-meta { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem; color: #666; }
+.sbe-event-meta span, .sbe-service-meta span { display: flex; align-items: center; gap: 0.25rem; }
+.sbe-event-link, .sbe-service-link { display: inline-block; background: #0073aa; color: #fff; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; transition: background 0.3s ease; }
+.sbe-event-link:hover, .sbe-service-link:hover { background: #005a87; color: #fff; }
+.sbe-calendar { max-width: 100%; margin: 2rem 0; padding: 1.5rem; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.sbe-calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #e0e0e0; }
+.sbe-calendar-title { margin: 0; font-size: 1.5rem; color: #333; }
+.sbe-calendar-prev, .sbe-calendar-next { background: #0073aa; color: #fff; border: none; border-radius: 4px; padding: 0.5rem 1rem; cursor: pointer; transition: background 0.3s ease; }
+.sbe-calendar-prev:hover, .sbe-calendar-next:hover { background: #005a87; }
+.sbe-calendar-grid { margin-bottom: 1rem; }
+.sbe-calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; margin-bottom: 1px; }
+.sbe-calendar-weekdays div { background: #f9f9f9; padding: 0.75rem; text-align: center; font-weight: 600; color: #333; font-size: 0.875rem; }
+.sbe-calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #e0e0e0; border: 1px solid #e0e0e0; }
+.sbe-calendar-day { background: #fff; min-height: 100px; padding: 0.5rem; position: relative; }
+.sbe-calendar-day.other-month { background: #f5f5f5; color: #ccc; }
+.sbe-calendar-day.today { background: #e6f7ff; }
+.sbe-calendar-day-number { font-weight: 600; margin-bottom: 0.25rem; font-size: 0.875rem; }
+.sbe-calendar-day-events { font-size: 0.75rem; }
+.sbe-calendar-day-event { background: #0073aa; color: #fff; padding: 0.25rem; margin-bottom: 0.25rem; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sbe-calendar-events { margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #e0e0e0; }
+.sbe-calendar-event-item { padding: 0.75rem; margin-bottom: 0.5rem; background: #f9f9f9; border-left: 4px solid #0073aa; border-radius: 4px; }
+.sbe-calendar-event-item h4 { margin: 0 0 0.25rem; font-size: 1rem; color: #333; }
+.sbe-calendar-event-item p { margin: 0; font-size: 0.875rem; color: #666; }
+@media (max-width: 768px) {
+    .sbe-booking-form { padding: 1.5rem; }
+    .sbe-events-grid, .sbe-services-grid { grid-template-columns: 1fr; }
+    .sbe-calendar-weekdays, .sbe-calendar-days { grid-template-columns: repeat(7, 1fr); }
+    .sbe-calendar-day { min-height: 60px; padding: 0.25rem; }
+    .sbe-calendar-day-number { font-size: 0.75rem; }
+    .sbe-calendar-day-events { font-size: 0.625rem; }
+}
