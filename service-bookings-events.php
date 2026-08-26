@@ -2,15 +2,15 @@
 /**
  * Plugin Name: Service Bookings & Events
  * Description: Complete booking system with payments (Stripe/PayPal), subscriptions, recurring billing, and calendar feeds (iCal/Google Calendar)
- * Version: 1.5.0
- * Author: Richard McGrath/FourZeroWork
+ * Version: 1.6.0
+ * Author: Your Name
  * License: GPL v2 or later
- * Text Domain: foruzero.work
+ * Text Domain: service-bookings-events
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('SBE_VERSION', '1.5.0');
+define('SBE_VERSION', '1.6.0');
 define('SBE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SBE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -59,7 +59,7 @@ class Service_Bookings_Events {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
         $table_bookings = $wpdb->prefix . 'sbe_bookings';
-        $sql = "CREATE TABLE IF NOT EXISTS $table_bookings (id bigint(20) NOT NULL AUTO_INCREMENT, service_id bigint(20) NOT NULL, event_id bigint(20) DEFAULT NULL, customer_name varchar(255) NOT NULL, customer_email varchar(255) NOT NULL, customer_phone varchar(50) DEFAULT NULL, booking_date date NOT NULL, booking_time time NOT NULL, duration int(11) DEFAULT 60, host_name varchar(255) DEFAULT NULL, status varchar(50) DEFAULT 'pending', notes text, payment_status varchar(50) DEFAULT NULL, payment_gateway varchar(50) DEFAULT NULL, transaction_id varchar(255) DEFAULT NULL, payment_amount decimal(10,2) DEFAULT 0, payment_currency varchar(10) DEFAULT 'USD', payment_date datetime DEFAULT NULL, created_at datetime DEFAULT CURRENT_TIMESTAMP, updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (id), KEY service_id (service_id), KEY event_id (event_id), KEY booking_date (booking_date), KEY status (status), KEY payment_status (payment_status)) $charset_collate;";
+        $sql = "CREATE TABLE IF NOT EXISTS $table_bookings (id bigint(20) NOT NULL AUTO_INCREMENT, service_id bigint(20) NOT NULL, event_id bigint(20) DEFAULT NULL, customer_name varchar(255) NOT NULL, customer_email varchar(255) NOT NULL, customer_phone varchar(50) DEFAULT NULL, booking_date date NOT NULL, booking_time time NOT NULL, duration int(11) DEFAULT 60, price decimal(10,2) DEFAULT 0, host_name varchar(255) DEFAULT NULL, status varchar(50) DEFAULT 'pending', notes text, payment_status varchar(50) DEFAULT NULL, payment_gateway varchar(50) DEFAULT NULL, transaction_id varchar(255) DEFAULT NULL, payment_amount decimal(10,2) DEFAULT 0, payment_currency varchar(10) DEFAULT 'USD', payment_date datetime DEFAULT NULL, created_at datetime DEFAULT CURRENT_TIMESTAMP, updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (id), KEY service_id (service_id), KEY event_id (event_id), KEY booking_date (booking_date), KEY status (status), KEY payment_status (payment_status)) $charset_collate;";
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
@@ -87,6 +87,7 @@ class Service_Bookings_Events {
     public function service_settings_meta_box($post) {
         wp_nonce_field('sbe_save_service', 'sbe_service_nonce');
         $duration = get_post_meta($post->ID, '_sbe_duration', true);
+        $price = get_post_meta($post->ID, '_sbe_price', true);
         $host = get_post_meta($post->ID, '_sbe_host', true);
         if (!$duration) $duration = get_option('sbe_default_booking_duration', 60);
         ?>
@@ -94,6 +95,10 @@ class Service_Bookings_Events {
             <tr>
                 <th><label for="sbe_duration"><?php echo esc_html__('Duration (minutes)', 'service-bookings-events'); ?></label></th>
                 <td><input type="number" id="sbe_duration" name="sbe_duration" value="<?php echo esc_attr($duration); ?>" class="small-text" min="15" step="15"> <p class="description"><?php echo esc_html__('How long does this service take?', 'service-bookings-events'); ?></p></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_price"><?php echo esc_html__('Price', 'service-bookings-events'); ?></label></th>
+                <td><input type="number" id="sbe_price" name="sbe_price" value="<?php echo esc_attr($price); ?>" class="small-text" min="0" step="0.01" placeholder="0.00"> <span class="description"><?php echo esc_html__('Service price', 'service-bookings-events'); ?></span></td>
             </tr>
             <tr>
                 <th><label for="sbe_host"><?php echo esc_html__('Host / Provider', 'service-bookings-events'); ?></label></th>
@@ -104,9 +109,14 @@ class Service_Bookings_Events {
     }
     public function event_settings_meta_box($post) {
         wp_nonce_field('sbe_save_event', 'sbe_event_nonce');
+        $price = get_post_meta($post->ID, '_sbe_price', true);
         $host = get_post_meta($post->ID, '_sbe_host', true);
         ?>
         <table class="form-table">
+            <tr>
+                <th><label for="sbe_price"><?php echo esc_html__('Price', 'service-bookings-events'); ?></label></th>
+                <td><input type="number" id="sbe_price" name="sbe_price" value="<?php echo esc_attr($price); ?>" class="small-text" min="0" step="0.01" placeholder="0.00"> <span class="description"><?php echo esc_html__('Event ticket price', 'service-bookings-events'); ?></span></td>
+            </tr>
             <tr>
                 <th><label for="sbe_host"><?php echo esc_html__('Host / Provider', 'service-bookings-events'); ?></label></th>
                 <td><input type="text" id="sbe_host" name="sbe_host" value="<?php echo esc_attr($host); ?>" class="regular-text" placeholder="<?php echo esc_attr__('e.g., Conference Speaker, Workshop Leader', 'service-bookings-events'); ?>"> <p class="description"><?php echo esc_html__('Name of the person hosting this event', 'service-bookings-events'); ?></p></td>
@@ -119,12 +129,14 @@ class Service_Bookings_Events {
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
         if (isset($_POST['sbe_duration'])) update_post_meta($post_id, '_sbe_duration', intval($_POST['sbe_duration']));
+        if (isset($_POST['sbe_price'])) update_post_meta($post_id, '_sbe_price', floatval($_POST['sbe_price']));
         if (isset($_POST['sbe_host'])) update_post_meta($post_id, '_sbe_host', sanitize_text_field($_POST['sbe_host']));
     }
     public function save_event_meta($post_id) {
         if (!isset($_POST['sbe_event_nonce']) || !wp_verify_nonce($_POST['sbe_event_nonce'], 'sbe_save_event')) return;
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
+        if (isset($_POST['sbe_price'])) update_post_meta($post_id, '_sbe_price', floatval($_POST['sbe_price']));
         if (isset($_POST['sbe_host'])) update_post_meta($post_id, '_sbe_host', sanitize_text_field($_POST['sbe_host']));
     }
     public function admin_dashboard_page() {
@@ -183,7 +195,7 @@ class Service_Bookings_Events {
     public function bookings_page() {
         global $wpdb;
         $bookings = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}sbe_bookings ORDER BY created_at DESC");
-        ?><div class="wrap"><h1><?php echo esc_html__('All Bookings', 'service-bookings-events'); ?></h1><table class="wp-list-table widefat fixed striped"><thead><tr><th><?php echo esc_html__('ID', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Customer', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Service/Event', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Host', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Date & Time', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Duration', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Status', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Payment', 'service-bookings-events'); ?></th></tr></thead><tbody><?php if (empty($bookings)): ?><tr><td colspan="8"><?php echo esc_html__('No bookings found.', 'service-bookings-events'); ?></td></tr><?php else: ?><?php foreach ($bookings as $booking): ?><tr><td>#<?php echo esc_html($booking->id); ?></td><td><?php echo esc_html($booking->customer_name); ?><br><small><?php echo esc_html($booking->customer_email); ?></small></td><td><?php $service = get_post($booking->service_id); echo $service ? esc_html($service->post_title) : 'N/A'; ?></td><td><?php echo $booking->host_name ? esc_html($booking->host_name) : '-'; ?></td><td><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($booking->booking_date)) . ' ' . date_i18n(get_option('time_format'), strtotime($booking->booking_time))); ?></td><td><?php echo esc_html($booking->duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></td><td><span class="sbe-status sbe-status-<?php echo esc_attr($booking->status); ?>"><?php echo esc_html(ucfirst($booking->status)); ?></span></td><td><?php if ($booking->payment_status === 'paid'): ?><span style="color: #46b450;"><?php echo esc_html__('Paid'); ?></span><?php elseif ($booking->payment_status): ?><?php echo esc_html(ucfirst($booking->payment_status)); ?><?php else: ?>-<?php endif; ?></td></tr><?php endforeach; ?><?php endif; ?></tbody></table></div><?php
+        ?><div class="wrap"><h1><?php echo esc_html__('All Bookings', 'service-bookings-events'); ?></h1><table class="wp-list-table widefat fixed striped"><thead><tr><th><?php echo esc_html__('ID', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Customer', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Service/Event', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Host', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Price', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Date & Time', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Duration', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Status', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Payment', 'service-bookings-events'); ?></th></tr></thead><tbody><?php if (empty($bookings)): ?><tr><td colspan="9"><?php echo esc_html__('No bookings found.', 'service-bookings-events'); ?></td></tr><?php else: ?><?php foreach ($bookings as $booking): ?><tr><td>#<?php echo esc_html($booking->id); ?></td><td><?php echo esc_html($booking->customer_name); ?><br><small><?php echo esc_html($booking->customer_email); ?></small></td><td><?php $service = get_post($booking->service_id); echo $service ? esc_html($service->post_title) : 'N/A'; ?></td><td><?php echo $booking->host_name ? esc_html($booking->host_name) : '-'; ?></td><td><?php echo $booking->price > 0 ? esc_html(number_format($booking->price, 2)) : '-'; ?></td><td><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($booking->booking_date)) . ' ' . date_i18n(get_option('time_format'), strtotime($booking->booking_time))); ?></td><td><?php echo esc_html($booking->duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></td><td><span class="sbe-status sbe-status-<?php echo esc_attr($booking->status); ?>"><?php echo esc_html(ucfirst($booking->status)); ?></span></td><td><?php if ($booking->payment_status === 'paid'): ?><span style="color: #46b450;"><?php echo esc_html__('Paid'); ?></span><?php elseif ($booking->payment_status): ?><?php echo esc_html(ucfirst($booking->payment_status)); ?><?php else: ?>-<?php endif; ?></td></tr><?php endforeach; ?><?php endif; ?></tbody></table></div><?php
     }
     public function admin_enqueue_scripts($hook) { if (strpos($hook, 'sbe-') === false) return; wp_enqueue_style('sbe-admin', SBE_PLUGIN_URL . 'assets/css/admin.css', array(), SBE_VERSION); wp_enqueue_script('sbe-admin', SBE_PLUGIN_URL . 'assets/js/admin.js', array('jquery'), SBE_VERSION, true); }
     public function frontend_enqueue_scripts() { wp_enqueue_style('sbe-frontend', SBE_PLUGIN_URL . 'assets/css/frontend.css', array(), SBE_VERSION); wp_enqueue_script('sbe-frontend', SBE_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), SBE_VERSION, true); wp_localize_script('sbe-frontend', 'sbe_ajax', array('ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('sbe_booking_nonce'))); }
@@ -199,11 +211,13 @@ class Service_Bookings_Events {
         $notes = sanitize_textarea_field($_POST['notes']);
         $duration = get_post_meta($service_id, '_sbe_duration', true);
         if (!$duration) $duration = get_option('sbe_default_booking_duration', 60);
+        $price = get_post_meta($service_id, '_sbe_price', true);
+        if (!$price && $event_id) $price = get_post_meta($event_id, '_sbe_price', true);
         $host_name = get_post_meta($service_id, '_sbe_host', true);
         if (!$host_name && $event_id) $host_name = get_post_meta($event_id, '_sbe_host', true);
         if (empty($customer_name) || empty($customer_email) || empty($booking_date) || empty($booking_time)) { wp_send_json_error(array('message' => __('Please fill in all required fields.', 'service-bookings-events'))); }
         global $wpdb;
-        $result = $wpdb->insert($wpdb->prefix . 'sbe_bookings', array('service_id' => $service_id, 'event_id' => $event_id, 'customer_name' => $customer_name, 'customer_email' => $customer_email, 'customer_phone' => $customer_phone, 'booking_date' => $booking_date, 'booking_time' => $booking_time, 'duration' => $duration, 'host_name' => $host_name, 'status' => 'pending', 'notes' => $notes), array('%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s'));
+        $result = $wpdb->insert($wpdb->prefix . 'sbe_bookings', array('service_id' => $service_id, 'event_id' => $event_id, 'customer_name' => $customer_name, 'customer_email' => $customer_email, 'customer_phone' => $customer_phone, 'booking_date' => $booking_date, 'booking_time' => $booking_time, 'duration' => $duration, 'price' => $price ? $price : 0, 'host_name' => $host_name, 'status' => 'pending', 'notes' => $notes), array('%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%f', '%s', '%s'));
         if ($result === false) { wp_send_json_error(array('message' => __('Failed to create booking.', 'service-bookings-events'))); }
         $booking_id = $wpdb->insert_id;
         if (get_option('sbe_confirmation_email_enabled', true)) { $this->send_confirmation_email($booking_id); }
@@ -221,7 +235,7 @@ class Service_Bookings_Events {
     public function booking_form_shortcode($atts) {
         $atts = shortcode_atts(array('type' => 'service', 'id' => ''), $atts);
         ob_start();
-        ?><div class="sbe-booking-form"><form class="sbe-form"><div class="sbe-form-group"><label for="sbe_customer_name"><?php echo esc_html__('Your Name', 'service-bookings-events'); ?> *</label><input type="text" id="sbe_customer_name" name="customer_name" required></div><div class="sbe-form-group"><label for="sbe_customer_email"><?php echo esc_html__('Email', 'service-bookings-events'); ?> *</label><input type="email" id="sbe_customer_email" name="customer_email" required></div><div class="sbe-form-group"><label for="sbe_customer_phone"><?php echo esc_html__('Phone', 'service-bookings-events'); ?></label><input type="tel" id="sbe_customer_phone" name="customer_phone"></div><?php if ($atts['type'] === 'service' && empty($atts['id'])): ?><div class="sbe-form-group"><label for="sbe_service_select"><?php echo esc_html__('Select Service', 'service-bookings-events'); ?> *</label><select id="sbe_service_select" name="service_id" required><option value=""><?php echo esc_html__('Choose a service...', 'service-bookings-events'); ?></option><?php $services = get_posts(array('post_type' => 'sbe_service', 'posts_per_page' => -1, 'post_status' => 'publish')); foreach ($services as $service): $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); $label = $service->post_title . ' (' . $duration . ' ' . __('min', 'service-bookings-events'); if ($host) $label .= ' - ' . $host; $label .= ')'; ?><option value="<?php echo esc_attr($service->ID); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><?php endif; ?><div class="sbe-form-group"><label for="sbe_booking_date"><?php echo esc_html__('Date', 'service-bookings-events'); ?> *</label><input type="date" id="sbe_booking_date" name="booking_date" required min="<?php echo esc_attr(date('Y-m-d')); ?>"></div><div class="sbe-form-group"><label for="sbe_booking_time"><?php echo esc_html__('Time', 'service-bookings-events'); ?> *</label><select id="sbe_booking_time" name="booking_time" required><option value=""><?php echo esc_html__('Select a time...', 'service-bookings-events'); ?></option><?php for ($hour = 9; $hour <= 18; $hour++) { foreach (array('00', '30') as $minute) { $time = sprintf('%02d:%s:00', $hour, $minute); echo '<option value="' . esc_attr($time) . '">' . esc_html(date_i18n(get_option('time_format'), strtotime($time))) . '</option>'; } } ?></select></div><div class="sbe-form-group"><label for="sbe_booking_notes"><?php echo esc_html__('Notes', 'service-bookings-events'); ?></label><textarea id="sbe_booking_notes" name="notes" rows="4"></textarea></div><div class="sbe-form-submit"><button type="submit" class="sbe-submit-btn"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></button></div><div class="sbe-message"></div></form></div><?php
+        ?><div class="sbe-booking-form"><form class="sbe-form"><div class="sbe-form-group"><label for="sbe_customer_name"><?php echo esc_html__('Your Name', 'service-bookings-events'); ?> *</label><input type="text" id="sbe_customer_name" name="customer_name" required></div><div class="sbe-form-group"><label for="sbe_customer_email"><?php echo esc_html__('Email', 'service-bookings-events'); ?> *</label><input type="email" id="sbe_customer_email" name="customer_email" required></div><div class="sbe-form-group"><label for="sbe_customer_phone"><?php echo esc_html__('Phone', 'service-bookings-events'); ?></label><input type="tel" id="sbe_customer_phone" name="customer_phone"></div><?php if ($atts['type'] === 'service' && empty($atts['id'])): ?><div class="sbe-form-group"><label for="sbe_service_select"><?php echo esc_html__('Select Service', 'service-bookings-events'); ?> *</label><select id="sbe_service_select" name="service_id" required><option value=""><?php echo esc_html__('Choose a service...', 'service-bookings-events'); ?></option><?php $services = get_posts(array('post_type' => 'sbe_service', 'posts_per_page' => -1, 'post_status' => 'publish')); foreach ($services as $service): $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); $price = get_post_meta($service->ID, '_sbe_price', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); $label = $service->post_title . ' ('; if ($price > 0) $label .= number_format($price, 2) . ' | '; $label .= $duration . ' ' . __('min', 'service-bookings-events'); if ($host) $label .= ' | ' . $host; $label .= ')'; ?><option value="<?php echo esc_attr($service->ID); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></div><?php endif; ?><div class="sbe-form-group"><label for="sbe_booking_date"><?php echo esc_html__('Date', 'service-bookings-events'); ?> *</label><input type="date" id="sbe_booking_date" name="booking_date" required min="<?php echo esc_attr(date('Y-m-d')); ?>"></div><div class="sbe-form-group"><label for="sbe_booking_time"><?php echo esc_html__('Time', 'service-bookings-events'); ?> *</label><select id="sbe_booking_time" name="booking_time" required><option value=""><?php echo esc_html__('Select a time...', 'service-bookings-events'); ?></option><?php for ($hour = 9; $hour <= 18; $hour++) { foreach (array('00', '30') as $minute) { $time = sprintf('%02d:%s:00', $hour, $minute); echo '<option value="' . esc_attr($time) . '">' . esc_html(date_i18n(get_option('time_format'), strtotime($time))) . '</option>'; } } ?></select></div><div class="sbe-form-group"><label for="sbe_booking_notes"><?php echo esc_html__('Notes', 'service-bookings-events'); ?></label><textarea id="sbe_booking_notes" name="notes" rows="4"></textarea></div><div class="sbe-form-submit"><button type="submit" class="sbe-submit-btn"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></button></div><div class="sbe-message"></div></form></div><?php
         return ob_get_clean();
     }
     public function events_list_shortcode($atts) {
@@ -229,7 +243,7 @@ class Service_Bookings_Events {
         $args = array('post_type' => 'sbe_event', 'posts_per_page' => intval($atts['limit']), 'post_status' => 'publish');
         $events = get_posts($args);
         ob_start();
-        ?><div class="sbe-events-list"><div class="sbe-events-grid"><?php foreach ($events as $event): ?><div class="sbe-event-card"><?php if (has_post_thumbnail($event->ID)): ?><div class="sbe-event-thumbnail"><?php echo get_the_post_thumbnail($event->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-event-content"><h3 class="sbe-event-title"><a href="<?php echo get_permalink($event->ID); ?>"><?php echo esc_html($event->post_title); ?></a></h3><?php $host = get_post_meta($event->ID, '_sbe_host', true); if ($host): ?><p class="sbe-event-host"><?php echo esc_html__('Host:', 'service-bookings-events'); ?> <strong><?php echo esc_html($host); ?></strong></p><?php endif; ?><?php if (has_excerpt($event->ID)): ?><div class="sbe-event-excerpt"><?php echo esc_html(get_the_excerpt($event->ID)); ?></div><?php endif; ?><a href="<?php echo get_permalink($event->ID); ?>" class="sbe-event-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
+        ?><div class="sbe-events-list"><div class="sbe-events-grid"><?php foreach ($events as $event): ?><div class="sbe-event-card"><?php if (has_post_thumbnail($event->ID)): ?><div class="sbe-event-thumbnail"><?php echo get_the_post_thumbnail($event->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-event-content"><h3 class="sbe-event-title"><a href="<?php echo get_permalink($event->ID); ?>"><?php echo esc_html($event->post_title); ?></a></h3><?php $host = get_post_meta($event->ID, '_sbe_host', true); $price = get_post_meta($event->ID, '_sbe_price', true); if ($price > 0 || $host): ?><p class="sbe-event-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('Host:', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($event->ID)): ?><div class="sbe-event-excerpt"><?php echo esc_html(get_the_excerpt($event->ID)); ?></div><?php endif; ?><a href="<?php echo get_permalink($event->ID); ?>" class="sbe-event-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
         return ob_get_clean();
     }
     public function services_list_shortcode($atts) {
@@ -237,7 +251,7 @@ class Service_Bookings_Events {
         $args = array('post_type' => 'sbe_service', 'posts_per_page' => intval($atts['limit']), 'post_status' => 'publish');
         $services = get_posts($args);
         ob_start();
-        ?><div class="sbe-services-list"><div class="sbe-services-grid"><?php foreach ($services as $service): ?><div class="sbe-service-card"><?php if (has_post_thumbnail($service->ID)): ?><div class="sbe-service-thumbnail"><?php echo get_the_post_thumbnail($service->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-service-content"><h3 class="sbe-service-title"><a href="<?php echo get_permalink($service->ID); ?>"><?php echo esc_html($service->post_title); ?></a></h3><?php $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); if ($host || $duration): ?><p class="sbe-service-meta"><?php if ($duration): ?><span class="sbe-duration"><?php echo esc_html($duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('with', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($service->ID)): ?><div class="sbe-service-excerpt"><?php echo esc_html(get_the_excerpt($service->ID)); ?></div><?php endif; ?><a href="<?php echo get_permalink($service->ID); ?>" class="sbe-service-link button"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
+        ?><div class="sbe-services-list"><div class="sbe-services-grid"><?php foreach ($services as $service): ?><div class="sbe-service-card"><?php if (has_post_thumbnail($service->ID)): ?><div class="sbe-service-thumbnail"><?php echo get_the_post_thumbnail($service->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-service-content"><h3 class="sbe-service-title"><a href="<?php echo get_permalink($service->ID); ?>"><?php echo esc_html($service->post_title); ?></a></h3><?php $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); $price = get_post_meta($service->ID, '_sbe_price', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); if ($price > 0 || $host || $duration): ?><p class="sbe-service-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($duration): ?><span class="sbe-duration"><?php echo esc_html($duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('with', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($service->ID)): ?><div class="sbe-service-excerpt"><?php echo esc_html(get_the_excerpt($service->ID)); ?></div><?php endif; ?><a href="<?php echo get_permalink($service->ID); ?>" class="sbe-service-link button"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
         return ob_get_clean();
     }
     public function calendar_shortcode($atts) {
@@ -264,7 +278,7 @@ class Service_Bookings_Events {
             if ($booking->host_name) echo "ORGANIZER;CN=" . $booking->host_name . "\r\n";
             echo "DTSTART:" . date('Ymd\THis', $dt) . "\r\n";
             echo "DTEND:" . date('Ymd\THis', $end_dt) . "\r\n";
-            echo "DESCRIPTION:" . $booking->notes . "\r\n";
+            echo "DESCRIPTION:Price: " . number_format($booking->price, 2) . "\\n" . $booking->notes . "\r\n";
             echo "UID:" . $booking->id . "@sbe\r\n";
             echo "END:VEVENT\r\n";
         }
@@ -278,7 +292,7 @@ class Service_Bookings_Events {
         $to = $booking->customer_email;
         $subject = __('Booking Confirmation', 'service-bookings-events');
         $service = get_post($booking->service_id);
-        $message = sprintf(__('Dear %s,\n\nYour booking has been submitted successfully.\n\nBooking ID: %d\nService: %s\nHost: %s\nDate: %s\nTime: %s\nDuration: %d minutes\n\nWe will confirm your appointment soon.\n\nThank you!', 'service-bookings-events'), $booking->customer_name, $booking->id, $service ? $service->post_title : 'N/A', $booking->host_name ? $booking->host_name : 'N/A', $booking->booking_date, $booking->booking_time, $booking->duration);
+        $message = sprintf(__('Dear %s,\n\nYour booking has been submitted successfully.\n\nBooking ID: %d\nService: %s\nHost: %s\nPrice: $%s\nDate: %s\nTime: %s\nDuration: %d minutes\n\nWe will confirm your appointment soon.\n\nThank you!', 'service-bookings-events'), $booking->customer_name, $booking->id, $service ? $service->post_title : 'N/A', $booking->host_name ? $booking->host_name : 'N/A', number_format($booking->price, 2), $booking->booking_date, $booking->booking_time, $booking->duration);
         wp_mail($to, $subject, $message);
     }
 }
