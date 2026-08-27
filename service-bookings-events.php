@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Service Bookings & Events
  * Description: Complete booking system with payments (Stripe/PayPal), subscriptions, recurring billing, and calendar feeds (iCal/Google Calendar)
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: Your Name
  * License: GPL v2 or later
  * Text Domain: service-bookings-events
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('SBE_VERSION', '1.7.0');
+define('SBE_VERSION', '1.8.0');
 define('SBE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SBE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -250,21 +250,29 @@ class Service_Bookings_Events {
         return ob_get_clean();
     }
     public function events_list_shortcode($atts) {
-        $atts = shortcode_atts(array('category' => '', 'limit' => 10), $atts);
+        $atts = shortcode_atts(array('category' => '', 'limit' => 10, 'layout' => 'grid'), $atts);
         $args = array('post_type' => 'sbe_event', 'posts_per_page' => intval($atts['limit']), 'post_status' => 'publish');
+        if (!empty($atts['category'])) {
+            $args['tax_query'] = array(array('taxonomy' => 'sbe_event_category', 'field' => 'slug', 'terms' => $atts['category']));
+        }
         $events = get_posts($args);
+        $layout_class = $atts['layout'] === 'list' ? 'sbe-events-list' : 'sbe-events-grid';
         ob_start();
-        ?><div class="sbe-events-list"><div class="sbe-events-grid"><?php foreach ($events as $event): ?><div class="sbe-event-card"><?php if (has_post_thumbnail($event->ID)): ?><div class="sbe-event-thumbnail"><?php echo get_the_post_thumbnail($event->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-event-content"><h3 class="sbe-event-title"><a href="<?php echo get_permalink($event->ID); ?>"><?php echo esc_html($event->post_title); ?></a></h3><?php $host = get_post_meta($event->ID, '_sbe_host', true); $price = get_post_meta($event->ID, '_sbe_price', true); if ($price > 0 || $host): ?><p class="sbe-event-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('Host:', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($event->ID)): ?><div class="sbe-event-excerpt"><?php echo esc_html(get_the_excerpt($event->ID)); ?></div><?php endif; ?><a href="<?php echo get_permalink($event->ID); ?>" class="sbe-event-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
+        ?><div class="sbe-events <?php echo esc_attr($layout_class); ?>"><div class="sbe-events-inner"><?php foreach ($events as $event): ?><div class="sbe-event-card"><?php if (has_post_thumbnail($event->ID)): ?><div class="sbe-event-thumbnail"><?php echo get_the_post_thumbnail($event->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-event-content"><h3 class="sbe-event-title"><a href="<?php echo get_permalink($event->ID); ?>"><?php echo esc_html($event->post_title); ?></a></h3><?php $host = get_post_meta($event->ID, '_sbe_host', true); $price = get_post_meta($event->ID, '_sbe_price', true); if ($price > 0 || $host): ?><p class="sbe-event-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('Host:', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($event->ID)): ?><div class="sbe-event-excerpt"><?php echo esc_html(get_the_excerpt($event->ID)); ?></div><?php endif; ?><a href="<?php echo get_permalink($event->ID); ?>" class="sbe-event-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
         return ob_get_clean();
     }
     public function services_list_shortcode($atts) {
-        $atts = shortcode_atts(array('category' => '', 'limit' => -1), $atts);
+        $atts = shortcode_atts(array('category' => '', 'limit' => -1, 'layout' => 'grid'), $atts);
         $args = array('post_type' => 'sbe_service', 'posts_per_page' => intval($atts['limit']), 'post_status' => 'publish');
+        if (!empty($atts['category'])) {
+            $args['tax_query'] = array(array('taxonomy' => 'sbe_service_category', 'field' => 'slug', 'terms' => $atts['category']));
+        }
         $services = get_posts($args);
         $booking_page_id = get_option('sbe_booking_page_id', 0);
         $booking_url = $booking_page_id ? get_permalink($booking_page_id) : '#';
+        $layout_class = $atts['layout'] === 'list' ? 'sbe-services-list' : 'sbe-services-grid';
         ob_start();
-        ?><div class="sbe-services-list"><div class="sbe-services-grid"><?php foreach ($services as $service): ?><div class="sbe-service-card"><?php if (has_post_thumbnail($service->ID)): ?><div class="sbe-service-thumbnail"><?php echo get_the_post_thumbnail($service->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-service-content"><h3 class="sbe-service-title"><a href="<?php echo get_permalink($service->ID); ?>"><?php echo esc_html($service->post_title); ?></a></h3><?php $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); $price = get_post_meta($service->ID, '_sbe_price', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); if ($price > 0 || $host || $duration): ?><p class="sbe-service-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($duration): ?><span class="sbe-duration"><?php echo esc_html($duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('with', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($service->ID)): ?><div class="sbe-service-excerpt"><?php echo esc_html(get_the_excerpt($service->ID)); ?></div><?php endif; ?><?php if ($booking_page_id): ?><a href="<?php echo esc_url(add_query_arg('service', $service->ID, $booking_url)); ?>" class="sbe-service-link button"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></a><?php else: ?><a href="<?php echo get_permalink($service->ID); ?>" class="sbe-service-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a><?php endif; ?></div></div><?php endforeach; ?></div></div><?php
+        ?><div class="sbe-services <?php echo esc_attr($layout_class); ?>"><div class="sbe-services-inner"><?php foreach ($services as $service): ?><div class="sbe-service-card"><?php if (has_post_thumbnail($service->ID)): ?><div class="sbe-service-thumbnail"><?php echo get_the_post_thumbnail($service->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-service-content"><h3 class="sbe-service-title"><a href="<?php echo get_permalink($service->ID); ?>"><?php echo esc_html($service->post_title); ?></a></h3><?php $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); $price = get_post_meta($service->ID, '_sbe_price', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); if ($price > 0 || $host || $duration): ?><p class="sbe-service-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($duration): ?><span class="sbe-duration"><?php echo esc_html($duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('with', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($service->ID)): ?><div class="sbe-service-excerpt"><?php echo esc_html(get_the_excerpt($service->ID)); ?></div><?php endif; ?><?php if ($booking_page_id): ?><a href="<?php echo esc_url(add_query_arg('service', $service->ID, $booking_url)); ?>" class="sbe-service-link button"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></a><?php else: ?><a href="<?php echo get_permalink($service->ID); ?>" class="sbe-service-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a><?php endif; ?></div></div><?php endforeach; ?></div></div><?php
         return ob_get_clean();
     }
     public function calendar_shortcode($atts) {
