@@ -3,9 +3,9 @@
  * Plugin Name: Service Bookings & Events
  * Description: Complete booking system with payments (Stripe/PayPal), subscriptions, recurring billing, and calendar feeds (iCal/Google Calendar)
  * Version: 1.6.0
- * Author: Your Name
+ * Author: Richard McGrath/FourZeroWork
  * License: GPL v2 or later
- * Text Domain: service-bookings-events
+ * Text Domain: fourzero.work
  */
 
 if (!defined('ABSPATH')) exit;
