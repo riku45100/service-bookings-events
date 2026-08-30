@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Service Bookings & Events
  * Description: Complete booking system with payments (Stripe/PayPal), subscriptions, recurring billing, and calendar feeds (iCal/Google Calendar)
- * Version: 1.8.0
+ * Version: 2.0.0
  * Author: Your Name
  * License: GPL v2 or later
  * Text Domain: service-bookings-events
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('SBE_VERSION', '1.8.0');
+define('SBE_VERSION', '2.0.0');
 define('SBE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SBE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -40,14 +40,21 @@ class Service_Bookings_Events {
         add_shortcode('sbe_events_list', array($this, 'events_list_shortcode'));
         add_shortcode('sbe_services_list', array($this, 'services_list_shortcode'));
         add_shortcode('sbe_calendar', array($this, 'calendar_shortcode'));
+        add_shortcode('sbe_staff_list', array($this, 'staff_list_shortcode'));
         add_action('init', array($this, 'add_rewrite_rules'));
         add_filter('query_vars', array($this, 'add_query_vars'));
         add_action('template_redirect', array($this, 'handle_calendar_feed'));
         add_action('add_meta_boxes', array($this, 'add_service_meta_boxes'));
         add_action('add_meta_boxes', array($this, 'add_event_meta_boxes'));
+        add_action('add_meta_boxes', array($this, 'add_staff_meta_boxes'));
         add_action('save_post_sbe_service', array($this, 'save_service_meta'));
         add_action('save_post_sbe_event', array($this, 'save_event_meta'));
+        add_action('save_post_sbe_staff', array($this, 'save_staff_meta'));
         add_action('admin_init', array($this, 'register_settings'));
+        add_action('sbe_send_reminders', array($this, 'send_booking_reminders'));
+        if (!wp_next_scheduled_hook('sbe_send_reminders')) {
+            wp_schedule_event(time(), 'hourly', 'sbe_send_reminders');
+        }
     }
     public function activate() {
         $this->register_post_types();
@@ -55,27 +62,34 @@ class Service_Bookings_Events {
         flush_rewrite_rules();
         $this->create_database_tables();
     }
-    public function deactivate() { flush_rewrite_rules(); }
+    public function deactivate() {
+        flush_rewrite_rules();
+        wp_clear_scheduled_hook('sbe_send_reminders');
+    }
     private function create_database_tables() {
         global $wpdb;
         $charset_collate = $wpdb->get_charset_collate();
         $table_bookings = $wpdb->prefix . 'sbe_bookings';
-        $sql = "CREATE TABLE IF NOT EXISTS $table_bookings (id bigint(20) NOT NULL AUTO_INCREMENT, service_id bigint(20) NOT NULL, event_id bigint(20) DEFAULT NULL, customer_name varchar(255) NOT NULL, customer_email varchar(255) NOT NULL, customer_phone varchar(50) DEFAULT NULL, booking_date date NOT NULL, booking_time time NOT NULL, duration int(11) DEFAULT 60, price decimal(10,2) DEFAULT 0, host_name varchar(255) DEFAULT NULL, status varchar(50) DEFAULT 'pending', notes text, payment_status varchar(50) DEFAULT NULL, payment_gateway varchar(50) DEFAULT NULL, transaction_id varchar(255) DEFAULT NULL, payment_amount decimal(10,2) DEFAULT 0, payment_currency varchar(10) DEFAULT 'USD', payment_date datetime DEFAULT NULL, created_at datetime DEFAULT CURRENT_TIMESTAMP, updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (id), KEY service_id (service_id), KEY event_id (event_id), KEY booking_date (booking_date), KEY status (status), KEY payment_status (payment_status)) $charset_collate;";
+        $sql = "CREATE TABLE IF NOT EXISTS $table_bookings (id bigint(20) NOT NULL AUTO_INCREMENT, service_id bigint(20) NOT NULL, event_id bigint(20) DEFAULT NULL, staff_id bigint(20) DEFAULT NULL, customer_name varchar(255) NOT NULL, customer_email varchar(255) NOT NULL, customer_phone varchar(50) DEFAULT NULL, booking_date date NOT NULL, booking_time time NOT NULL, duration int(11) DEFAULT 60, price decimal(10,2) DEFAULT 0, host_name varchar(255) DEFAULT NULL, status varchar(50) DEFAULT 'pending', notes text, payment_status varchar(50) DEFAULT NULL, payment_gateway varchar(50) DEFAULT NULL, transaction_id varchar(255) DEFAULT NULL, payment_amount decimal(10,2) DEFAULT 0, payment_currency varchar(10) DEFAULT 'USD', payment_date datetime DEFAULT NULL, reminder_sent tinyint(1) DEFAULT 0, created_at datetime DEFAULT CURRENT_TIMESTAMP, updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (id), KEY service_id (service_id), KEY event_id (event_id), KEY staff_id (staff_id), KEY booking_date (booking_date), KEY status (status), KEY payment_status (payment_status)) $charset_collate;";
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
     }
     public function register_post_types() {
         register_post_type('sbe_service', array('labels' => array('name' => __('Services', 'service-bookings-events'), 'singular_name' => __('Service', 'service-bookings-events'), 'add_new' => __('Add New', 'service-bookings-events'), 'add_new_item' => __('Add New Service', 'service-bookings-events'), 'edit_item' => __('Edit Service', 'service-bookings-events')), 'public' => true, 'has_archive' => true, 'show_ui' => true, 'show_in_menu' => 'sbe-main', 'show_in_rest' => true, 'supports' => array('title', 'editor', 'thumbnail', 'excerpt'), 'menu_icon' => 'dashicons-calendar-alt', 'rewrite' => array('slug' => 'services')));
         register_post_type('sbe_event', array('labels' => array('name' => __('Events', 'service-bookings-events'), 'singular_name' => __('Event', 'service-bookings-events'), 'add_new' => __('Add New', 'service-bookings-events'), 'add_new_item' => __('Add New Event', 'service-bookings-events'), 'edit_item' => __('Edit Event', 'service-bookings-events')), 'public' => true, 'has_archive' => true, 'show_ui' => true, 'show_in_menu' => 'sbe-main', 'show_in_rest' => true, 'supports' => array('title', 'editor', 'thumbnail', 'excerpt'), 'menu_icon' => 'dashicons-calendar', 'rewrite' => array('slug' => 'events')));
+        register_post_type('sbe_staff', array('labels' => array('name' => __('Staff', 'service-bookings-events'), 'singular_name' => __('Staff Member', 'service-bookings-events'), 'add_new' => __('Add New', 'service-bookings-events'), 'add_new_item' => __('Add New Staff Member', 'service-bookings-events'), 'edit_item' => __('Edit Staff Member', 'service-bookings-events'), 'all_items' => __('All Staff', 'service-bookings-events')), 'public' => true, 'has_archive' => true, 'show_ui' => true, 'show_in_menu' => 'sbe-main', 'show_in_rest' => true, 'supports' => array('title', 'editor', 'thumbnail'), 'menu_icon' => 'dashicons-businessperson', 'rewrite' => array('slug' => 'staff')));
     }
     public function register_taxonomies() {
         register_taxonomy('sbe_service_category', array('sbe_service'), array('labels' => array('name' => __('Service Categories', 'service-bookings-events'), 'singular_name' => __('Service Category', 'service-bookings-events'), 'menu_name' => __('Categories', 'service-bookings-events')), 'hierarchical' => true, 'show_ui' => true, 'show_in_rest' => true, 'rewrite' => array('slug' => 'service-category')));
         register_taxonomy('sbe_event_category', array('sbe_event'), array('labels' => array('name' => __('Event Categories', 'service-bookings-events'), 'singular_name' => __('Event Category', 'service-bookings-events'), 'menu_name' => __('Categories', 'service-bookings-events')), 'hierarchical' => true, 'show_ui' => true, 'show_in_rest' => true, 'rewrite' => array('slug' => 'event-category')));
+        register_taxonomy('sbe_staff_category', array('sbe_staff'), array('labels' => array('name' => __('Staff Categories', 'service-bookings-events'), 'singular_name' => __('Staff Category', 'service-bookings-events'), 'menu_name' => __('Categories', 'service-bookings-events')), 'hierarchical' => true, 'show_ui' => true, 'show_in_rest' => true, 'rewrite' => array('slug' => 'staff-category')));
     }
     public function add_admin_menu() {
         add_menu_page(__('Service Bookings & Events', 'service-bookings-events'), __('Bookings & Events', 'service-bookings-events'), 'manage_options', 'sbe-main', array($this, 'admin_dashboard_page'), 'dashicons-calendar-alt', 30);
         add_submenu_page('sbe-main', __('All Bookings', 'service-bookings-events'), __('All Bookings', 'service-bookings-events'), 'manage_options', 'sbe-bookings', array($this, 'bookings_page'));
+        add_submenu_page('sbe-main', __('Staff', 'service-bookings-events'), __('Staff', 'service-bookings-events'), 'manage_options', 'sbe-staff', array($this, 'staff_page'));
         add_submenu_page('sbe-main', __('Payment Gateway', 'service-bookings-events'), __('Payment Gateway', 'service-bookings-events'), 'manage_options', 'sbe-payments', array($this, 'payment_gateway_page'));
+        add_submenu_page('sbe-main', __('Messaging', 'service-bookings-events'), __('Messaging', 'service-bookings-events'), 'manage_options', 'sbe-messaging', array($this, 'messaging_page'));
         add_submenu_page('sbe-main', __('Calendar Feeds', 'service-bookings-events'), __('Calendar Feeds', 'service-bookings-events'), 'manage_options', 'sbe-calendar-feeds', array($this, 'calendar_feeds_page'));
         add_submenu_page('sbe-main', __('Settings', 'service-bookings-events'), __('Settings', 'service-bookings-events'), 'manage_options', 'sbe-settings', array($this, 'settings_page'));
     }
@@ -84,6 +98,16 @@ class Service_Bookings_Events {
         register_setting('sbe_settings_group', 'sbe_confirmation_email_enabled');
         register_setting('sbe_settings_group', 'sbe_default_booking_duration');
         register_setting('sbe_settings_group', 'sbe_admin_email');
+        register_setting('sbe_messaging_group', 'sbe_whatsapp_enabled');
+        register_setting('sbe_messaging_group', 'sbe_whatsapp_account_sid');
+        register_setting('sbe_messaging_group', 'sbe_whatsapp_auth_token');
+        register_setting('sbe_messaging_group', 'sbe_whatsapp_from_number');
+        register_setting('sbe_messaging_group', 'sbe_telegram_enabled');
+        register_setting('sbe_messaging_group', 'sbe_telegram_bot_token');
+        register_setting('sbe_messaging_group', 'sbe_signal_enabled');
+        register_setting('sbe_messaging_group', 'sbe_signal_account_number');
+        register_setting('sbe_messaging_group', 'sbe_signal_api_key');
+        register_setting('sbe_messaging_group', 'sbe_reminder_hours_before');
     }
     public function add_service_meta_boxes() {
         add_meta_box('sbe_service_settings', __('Service Settings', 'service-bookings-events'), array($this, 'service_settings_meta_box'), 'sbe_service', 'normal', 'high');
@@ -91,11 +115,17 @@ class Service_Bookings_Events {
     public function add_event_meta_boxes() {
         add_meta_box('sbe_event_settings', __('Event Settings', 'service-bookings-events'), array($this, 'event_settings_meta_box'), 'sbe_event', 'normal', 'high');
     }
+    public function add_staff_meta_boxes() {
+        add_meta_box('sbe_staff_details', __('Staff Details', 'service-bookings-events'), array($this, 'staff_details_meta_box'), 'sbe_staff', 'normal', 'high');
+        add_meta_box('sbe_staff_messaging', __('Messaging Settings', 'service-bookings-events'), array($this, 'staff_messaging_meta_box'), 'sbe_staff', 'normal', 'high');
+        add_meta_box('sbe_staff_services', __('Assigned Services', 'service-bookings-events'), array($this, 'staff_services_meta_box'), 'sbe_staff', 'side', 'default');
+    }
     public function service_settings_meta_box($post) {
         wp_nonce_field('sbe_save_service', 'sbe_service_nonce');
         $duration = get_post_meta($post->ID, '_sbe_duration', true);
         $price = get_post_meta($post->ID, '_sbe_price', true);
         $host = get_post_meta($post->ID, '_sbe_host', true);
+        $staff_id = get_post_meta($post->ID, '_sbe_staff_id', true);
         if (!$duration) $duration = get_option('sbe_default_booking_duration', 60);
         ?>
         <table class="form-table">
@@ -110,6 +140,10 @@ class Service_Bookings_Events {
             <tr>
                 <th><label for="sbe_host"><?php echo esc_html__('Host / Provider', 'service-bookings-events'); ?></label></th>
                 <td><input type="text" id="sbe_host" name="sbe_host" value="<?php echo esc_attr($host); ?>" class="regular-text" placeholder="<?php echo esc_attr__('e.g., John Smith, Dr. Johnson', 'service-bookings-events'); ?>"> <p class="description"><?php echo esc_html__('Name of the person providing this service', 'service-bookings-events'); ?></p></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_staff_id"><?php echo esc_html__('Assigned Staff', 'service-bookings-events'); ?></label></th>
+                <td><select id="sbe_staff_id" name="sbe_staff_id"><option value="0"><?php echo esc_html__('None', 'service-bookings-events'); ?></option><?php $staff_members = get_posts(array('post_type' => 'sbe_staff', 'posts_per_page' => -1, 'post_status' => 'publish')); foreach ($staff_members as $staff): ?><option value="<?php echo esc_attr($staff->ID); ?>" <?php selected($staff_id, $staff->ID); ?>><?php echo esc_html($staff->post_title); ?></option><?php endforeach; ?></select> <p class="description"><?php echo esc_html__('Link this service to a staff member', 'service-bookings-events'); ?></p></td>
             </tr>
         </table>
         <?php
@@ -131,6 +165,65 @@ class Service_Bookings_Events {
         </table>
         <?php
     }
+    public function staff_details_meta_box($post) {
+        wp_nonce_field('sbe_save_staff', 'sbe_staff_nonce');
+        $email = get_post_meta($post->ID, '_sbe_staff_email', true);
+        $phone = get_post_meta($post->ID, '_sbe_staff_phone', true);
+        $profile_link = get_post_meta($post->ID, '_sbe_staff_profile_link', true);
+        $bio = get_post_meta($post->ID, '_sbe_staff_bio', true);
+        ?>
+        <table class="form-table">
+            <tr>
+                <th><label for="sbe_staff_email"><?php echo esc_html__('Email', 'service-bookings-events'); ?></label></th>
+                <td><input type="email" id="sbe_staff_email" name="sbe_staff_email" value="<?php echo esc_attr($email); ?>" class="regular-text" required></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_staff_phone"><?php echo esc_html__('Phone (with country code)', 'service-bookings-events'); ?></label></th>
+                <td><input type="text" id="sbe_staff_phone" name="sbe_staff_phone" value="<?php echo esc_attr($phone); ?>" class="regular-text" placeholder="+1234567890" required></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_staff_profile_link"><?php echo esc_html__('Profile Link', 'service-bookings-events'); ?></label></th>
+                <td><input type="url" id="sbe_staff_profile_link" name="sbe_staff_profile_link" value="<?php echo esc_attr($profile_link); ?>" class="regular-text" placeholder="https://yourdomain.com/staff/john-doe"> <p class="description"><?php echo esc_html__('Custom profile page URL or leave blank to auto-generate', 'service-bookings-events'); ?></p></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_staff_bio"><?php echo esc_html__('Bio', 'service-bookings-events'); ?></label></th>
+                <td><textarea id="sbe_staff_bio" name="sbe_staff_bio" rows="4" class="large-text"><?php echo esc_textarea($bio); ?></textarea></td>
+            </tr>
+        </table>
+        <?php
+    }
+    public function staff_messaging_meta_box($post) {
+        wp_nonce_field('sbe_save_staff', 'sbe_staff_nonce');
+        $messaging_platform = get_post_meta($post->ID, '_sbe_messaging_platform', true);
+        $messaging_id = get_post_meta($post->ID, '_sbe_messaging_id', true);
+        $send_reminders = get_post_meta($post->ID, '_sbe_send_reminders', true);
+        ?>
+        <table class="form-table">
+            <tr>
+                <th><label for="sbe_messaging_platform"><?php echo esc_html__('Preferred Messaging Platform', 'service-bookings-events'); ?></label></th>
+                <td><select id="sbe_messaging_platform" name="sbe_messaging_platform"><option value="whatsapp" <?php selected($messaging_platform, 'whatsapp'); ?>><?php echo esc_html__('WhatsApp', 'service-bookings-events'); ?></option><option value="telegram" <?php selected($messaging_platform, 'telegram'); ?>><?php echo esc_html__('Telegram', 'service-bookings-events'); ?></option><option value="signal" <?php selected($messaging_platform, 'signal'); ?>><?php echo esc_html__('Signal', 'service-bookings-events'); ?></option></select> <p class="description"><?php echo esc_html__('Platform for receiving booking reminders', 'service-bookings-events'); ?></p></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_messaging_id"><?php echo esc_html__('Messaging ID / Username', 'service-bookings-events'); ?></label></th>
+                <td><input type="text" id="sbe_messaging_id" name="sbe_messaging_id" value="<?php echo esc_attr($messaging_id); ?>" class="regular-text" placeholder="<?php echo esc_attr__('Phone number, @username, or Signal number', 'service-bookings-events'); ?>"> <p class="description"><?php echo esc_html__('WhatsApp: phone with country code | Telegram: @username or chat ID | Signal: phone number', 'service-bookings-events'); ?></p></td>
+            </tr>
+            <tr>
+                <th><label for="sbe_send_reminders"><?php echo esc_html__('Send Reminders', 'service-bookings-events'); ?></label></th>
+                <td><label><input type="checkbox" id="sbe_send_reminders" name="sbe_send_reminders" value="1" <?php checked($send_reminders, '1'); ?>> <?php echo esc_html__('Enable booking reminders for this staff member', 'service-bookings-events'); ?></label></td>
+            </tr>
+        </table>
+        <?php
+    }
+    public function staff_services_meta_box($post) {
+        wp_nonce_field('sbe_save_staff', 'sbe_staff_nonce');
+        $assigned_services = get_post_meta($post->ID, '_sbe_assigned_services', true);
+        if (!is_array($assigned_services)) $assigned_services = array();
+        ?>
+        <div style="max-height: 300px; overflow-y: auto;">
+        <?php $services = get_posts(array('post_type' => 'sbe_service', 'posts_per_page' => -1, 'post_status' => 'publish')); if (empty($services)): ?><p><?php echo esc_html__('No services found. Create services first.', 'service-bookings-events'); ?></p><?php else: ?><?php foreach ($services as $service): ?><label style="display: block; margin: 8px 0;"><input type="checkbox" name="sbe_assigned_services[]" value="<?php echo esc_attr($service->ID); ?>" <?php echo in_array($service->ID, $assigned_services) ? 'checked' : ''; ?>> <?php echo esc_html($service->post_title); ?></label><?php endforeach; ?><?php endif; ?>
+        </div>
+        <?php
+    }
     public function save_service_meta($post_id) {
         if (!isset($_POST['sbe_service_nonce']) || !wp_verify_nonce($_POST['sbe_service_nonce'], 'sbe_save_service')) return;
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
@@ -138,6 +231,7 @@ class Service_Bookings_Events {
         if (isset($_POST['sbe_duration'])) update_post_meta($post_id, '_sbe_duration', intval($_POST['sbe_duration']));
         if (isset($_POST['sbe_price'])) update_post_meta($post_id, '_sbe_price', floatval($_POST['sbe_price']));
         if (isset($_POST['sbe_host'])) update_post_meta($post_id, '_sbe_host', sanitize_text_field($_POST['sbe_host']));
+        if (isset($_POST['sbe_staff_id'])) update_post_meta($post_id, '_sbe_staff_id', intval($_POST['sbe_staff_id']));
     }
     public function save_event_meta($post_id) {
         if (!isset($_POST['sbe_event_nonce']) || !wp_verify_nonce($_POST['sbe_event_nonce'], 'sbe_save_event')) return;
@@ -146,9 +240,53 @@ class Service_Bookings_Events {
         if (isset($_POST['sbe_price'])) update_post_meta($post_id, '_sbe_price', floatval($_POST['sbe_price']));
         if (isset($_POST['sbe_host'])) update_post_meta($post_id, '_sbe_host', sanitize_text_field($_POST['sbe_host']));
     }
+    public function save_staff_meta($post_id) {
+        if (!isset($_POST['sbe_staff_nonce']) || !wp_verify_nonce($_POST['sbe_staff_nonce'], 'sbe_save_staff')) return;
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+        if (!current_user_can('edit_post', $post_id)) return;
+        if (isset($_POST['sbe_staff_email'])) update_post_meta($post_id, '_sbe_staff_email', sanitize_email($_POST['sbe_staff_email']));
+        if (isset($_POST['sbe_staff_phone'])) update_post_meta($post_id, '_sbe_staff_phone', sanitize_text_field($_POST['sbe_staff_phone']));
+        if (isset($_POST['sbe_staff_profile_link'])) update_post_meta($post_id, '_sbe_staff_profile_link', esc_url_raw($_POST['sbe_staff_profile_link']));
+        if (isset($_POST['sbe_staff_bio'])) update_post_meta($post_id, '_sbe_staff_bio', sanitize_textarea_field($_POST['sbe_staff_bio']));
+        if (isset($_POST['sbe_messaging_platform'])) update_post_meta($post_id, '_sbe_messaging_platform', sanitize_text_field($_POST['sbe_messaging_platform']));
+        if (isset($_POST['sbe_messaging_id'])) update_post_meta($post_id, '_sbe_messaging_id', sanitize_text_field($_POST['sbe_messaging_id']));
+        if (isset($_POST['sbe_send_reminders'])) update_post_meta($post_id, '_sbe_send_reminders', '1'); else delete_post_meta($post_id, '_sbe_send_reminders');
+        if (isset($_POST['sbe_assigned_services'])) update_post_meta($post_id, '_sbe_assigned_services', array_map('intval', $_POST['sbe_assigned_services'])); else delete_post_meta($post_id, '_sbe_assigned_services');
+    }
     public function admin_dashboard_page() {
         global $wpdb;
-        ?><div class="wrap"><h1><?php echo esc_html__('Service Bookings & Events Dashboard', 'service-bookings-events'); ?></h1><div class="sbe-dashboard-widgets" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;"><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Total Services', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #0073aa;"><?php echo wp_count_posts('sbe_service')->publish; ?></p><a href="<?php echo admin_url('edit.php?post_type=sbe_service'); ?>"><?php echo esc_html__('View All Services', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Total Events', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #0073aa;"><?php echo wp_count_posts('sbe_event')->publish; ?></p><a href="<?php echo admin_url('edit.php?post_type=sbe_event'); ?>"><?php echo esc_html__('View All Events', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Pending Bookings', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #ffc107;"><?php echo $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sbe_bookings WHERE status = 'pending'"); ?></p><a href="<?php echo admin_url('admin.php?page=sbe-bookings'); ?>"><?php echo esc_html__('View All Bookings', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Paid Bookings', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #46b450;"><?php echo $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sbe_bookings WHERE payment_status = 'paid'"); ?></p><a href="<?php echo admin_url('admin.php?page=sbe-payments'); ?>"><?php echo esc_html__('Payment Settings', 'service-bookings-events'); ?></a></div></div><div class="sbe-quick-actions" style="margin-top: 30px;"><h2><?php echo esc_html__('Quick Actions', 'service-bookings-events'); ?></h2><a href="<?php echo admin_url('post-new.php?post_type=sbe_service'); ?>" class="button button-primary"><?php echo esc_html__('Add New Service', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('post-new.php?post_type=sbe_event'); ?>" class="button button-primary"><?php echo esc_html__('Add New Event', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('admin.php?page=sbe-payments'); ?>" class="button"><?php echo esc_html__('Configure Payments', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('admin.php?page=sbe-calendar-feeds'); ?>" class="button"><?php echo esc_html__('Calendar Feeds', 'service-bookings-events'); ?></a></div></div><?php
+        ?><div class="wrap"><h1><?php echo esc_html__('Service Bookings & Events Dashboard', 'service-bookings-events'); ?></h1><div class="sbe-dashboard-widgets" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;"><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Total Services', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #0073aa;"><?php echo wp_count_posts('sbe_service')->publish; ?></p><a href="<?php echo admin_url('edit.php?post_type=sbe_service'); ?>"><?php echo esc_html__('View All Services', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Total Events', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #0073aa;"><?php echo wp_count_posts('sbe_event')->publish; ?></p><a href="<?php echo admin_url('edit.php?post_type=sbe_event'); ?>"><?php echo esc_html__('View All Events', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Staff Members', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #0073aa;"><?php echo wp_count_posts('sbe_staff')->publish; ?></p><a href="<?php echo admin_url('edit.php?post_type=sbe_staff'); ?>"><?php echo esc_html__('Manage Staff', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Pending Bookings', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #ffc107;"><?php echo $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sbe_bookings WHERE status = 'pending'"); ?></p><a href="<?php echo admin_url('admin.php?page=sbe-bookings'); ?>"><?php echo esc_html__('View All Bookings', 'service-bookings-events'); ?></a></div><div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-radius: 4px;"><h3 style="margin: 0; color: #666; font-size: 14px;"><?php echo esc_html__('Paid Bookings', 'service-bookings-events'); ?></h3><p style="font-size: 2em; margin: 10px 0; color: #46b450;"><?php echo $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sbe_bookings WHERE payment_status = 'paid'"); ?></p><a href="<?php echo admin_url('admin.php?page=sbe-payments'); ?>"><?php echo esc_html__('Payment Settings', 'service-bookings-events'); ?></a></div></div><div class="sbe-quick-actions" style="margin-top: 30px;"><h2><?php echo esc_html__('Quick Actions', 'service-bookings-events'); ?></h2><a href="<?php echo admin_url('post-new.php?post_type=sbe_service'); ?>" class="button button-primary"><?php echo esc_html__('Add New Service', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('post-new.php?post_type=sbe_event'); ?>" class="button button-primary"><?php echo esc_html__('Add New Event', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('post-new.php?post_type=sbe_staff'); ?>" class="button button-primary"><?php echo esc_html__('Add New Staff', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('admin.php?page=sbe-messaging'); ?>" class="button"><?php echo esc_html__('Messaging Settings', 'service-bookings-events'); ?></a><a href="<?php echo admin_url('admin.php?page=sbe-calendar-feeds'); ?>" class="button"><?php echo esc_html__('Calendar Feeds', 'service-bookings-events'); ?></a></div></div><?php
+    }
+    public function staff_page() {
+        global $wpdb;
+        $staff_members = get_posts(array('post_type' => 'sbe_staff', 'posts_per_page' => -1, 'post_status' => 'publish'));
+        ?><div class="wrap"><h1><?php echo esc_html__('Staff Members', 'service-bookings-events'); ?></h1><a href="<?php echo admin_url('post-new.php?post_type=sbe_staff'); ?>" class="button button-primary" style="margin-bottom: 20px;"><?php echo esc_html__('Add New Staff Member', 'service-bookings-events'); ?></a><table class="wp-list-table widefat fixed striped"><thead><tr><th><?php echo esc_html__('Name', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Email', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Phone', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Platform', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Messaging ID', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Reminders', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Profile Link', 'service-bookings-events'); ?></th></tr></thead><tbody><?php if (empty($staff_members)): ?><tr><td colspan="7"><?php echo esc_html__('No staff members found. Click "Add New Staff Member" to create one.', 'service-bookings-events'); ?></td></tr><?php else: ?><?php foreach ($staff_members as $staff): $email = get_post_meta($staff->ID, '_sbe_staff_email', true); $phone = get_post_meta($staff->ID, '_sbe_staff_phone', true); $platform = get_post_meta($staff->ID, '_sbe_messaging_platform', true); $msg_id = get_post_meta($staff->ID, '_sbe_messaging_id', true); $reminders = get_post_meta($staff->ID, '_sbe_send_reminders', true); $profile_link = get_post_meta($staff->ID, '_sbe_staff_profile_link', true); if (empty($profile_link)) $profile_link = get_permalink($staff->ID); ?><tr><td><strong><a href="<?php echo get_edit_post_link($staff->ID); ?>"><?php echo esc_html($staff->post_title); ?></a></strong></td><td><?php echo esc_html($email); ?></td><td><?php echo esc_html($phone); ?></td><td><?php echo esc_html(ucfirst($platform)); ?></td><td><?php echo esc_html($msg_id); ?></td><td><?php echo $reminders ? '<span style="color: #46b450;">✓ ' . esc_html__('Enabled', 'service-bookings-events') . '</span>' : '<span style="color: #999;">' . esc_html__('Disabled', 'service-bookings-events') . '</span>'; ?></td><td><a href="<?php echo esc_url($profile_link); ?>" target="_blank"><?php echo esc_html__('View Profile', 'service-bookings-events'); ?></a></td></tr><?php endforeach; ?><?php endif; ?></tbody></table></div><?php
+    }
+    public function messaging_page() {
+        if (isset($_POST['sbe_save_messaging']) && wp_verify_nonce($_POST['sbe_messaging_nonce'], 'sbe_save_messaging')) {
+            update_option('sbe_whatsapp_enabled', isset($_POST['sbe_whatsapp_enabled']) ? true : false);
+            update_option('sbe_whatsapp_account_sid', sanitize_text_field($_POST['sbe_whatsapp_account_sid']));
+            update_option('sbe_whatsapp_auth_token', sanitize_text_field($_POST['sbe_whatsapp_auth_token']));
+            update_option('sbe_whatsapp_from_number', sanitize_text_field($_POST['sbe_whatsapp_from_number']));
+            update_option('sbe_telegram_enabled', isset($_POST['sbe_telegram_enabled']) ? true : false);
+            update_option('sbe_telegram_bot_token', sanitize_text_field($_POST['sbe_telegram_bot_token']));
+            update_option('sbe_signal_enabled', isset($_POST['sbe_signal_enabled']) ? true : false);
+            update_option('sbe_signal_account_number', sanitize_text_field($_POST['sbe_signal_account_number']));
+            update_option('sbe_signal_api_key', sanitize_text_field($_POST['sbe_signal_api_key']));
+            update_option('sbe_reminder_hours_before', intval($_POST['sbe_reminder_hours_before']));
+            echo '<div class="notice notice-success"><p>' . esc_html__('Messaging settings saved!', 'service-bookings-events') . '</p></div>';
+        }
+        $whatsapp_enabled = get_option('sbe_whatsapp_enabled', false);
+        $whatsapp_sid = get_option('sbe_whatsapp_account_sid', '');
+        $whatsapp_token = get_option('sbe_whatsapp_auth_token', '');
+        $whatsapp_from = get_option('sbe_whatsapp_from_number', '');
+        $telegram_enabled = get_option('sbe_telegram_enabled', false);
+        $telegram_token = get_option('sbe_telegram_bot_token', '');
+        $signal_enabled = get_option('sbe_signal_enabled', false);
+        $signal_number = get_option('sbe_signal_account_number', '');
+        $signal_key = get_option('sbe_signal_api_key', '');
+        $reminder_hours = get_option('sbe_reminder_hours_before', 24);
+        ?><div class="wrap"><h1><?php echo esc_html__('Messaging Settings', 'service-bookings-events'); ?></h1><form method="post"><?php wp_nonce_field('sbe_save_messaging', 'sbe_messaging_nonce'); ?><table class="form-table" style="max-width: 700px;"><tr><th colspan="2" style="background: #f0f0f1; padding: 15px;"><h2><?php echo esc_html__('Reminder Settings', 'service-bookings-events'); ?></h2></th></tr><tr><th><?php echo esc_html__('Send Reminders', 'service-bookings-events'); ?></th><td><input type="number" name="sbe_reminder_hours_before" value="<?php echo esc_attr($reminder_hours); ?>" class="small-text" min="1" max="168"> <?php echo esc_html__('hours before booking', 'service-bookings-events'); ?> <p class="description"><?php echo esc_html__('How far in advance to send booking reminders to staff', 'service-bookings-events'); ?></p></td></tr><tr><th colspan="2" style="background: #f0f0f1; padding: 15px;"><h2><?php echo esc_html__('WhatsApp (Twilio)', 'service-bookings-events'); ?></h2></th></tr><tr><th><?php echo esc_html__('Enable WhatsApp', 'service-bookings-events'); ?></th><td><label><input type="checkbox" name="sbe_whatsapp_enabled" value="1" <?php checked($whatsapp_enabled); ?>> <?php echo esc_html__('Send reminders via WhatsApp', 'service-bookings-events'); ?></label></td></tr><tr><th><?php echo esc_html__('Account SID', 'service-bookings-events'); ?></th><td><input type="text" name="sbe_whatsapp_account_sid" value="<?php echo esc_attr($whatsapp_sid); ?>" class="regular-text" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></td></tr><tr><th><?php echo esc_html__('Auth Token', 'service-bookings-events'); ?></th><td><input type="password" name="sbe_whatsapp_auth_token" value="<?php echo esc_attr($whatsapp_token); ?>" class="regular-text"></td></tr><tr><th><?php echo esc_html__('From Number', 'service-bookings-events'); ?></th><td><input type="text" name="sbe_whatsapp_from_number" value="<?php echo esc_attr($whatsapp_from); ?>" class="regular-text" placeholder="+1234567890"></td></tr><tr><th colspan="2" style="background: #f0f0f1; padding: 15px;"><h2><?php echo esc_html__('Telegram', 'service-bookings-events'); ?></h2></th></tr><tr><th><?php echo esc_html__('Enable Telegram', 'service-bookings-events'); ?></th><td><label><input type="checkbox" name="sbe_telegram_enabled" value="1" <?php checked($telegram_enabled); ?>> <?php echo esc_html__('Send reminders via Telegram', 'service-bookings-events'); ?></label></td></tr><tr><th><?php echo esc_html__('Bot Token', 'service-bookings-events'); ?></th><td><input type="password" name="sbe_telegram_bot_token" value="<?php echo esc_attr($telegram_token); ?>" class="regular-text" placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"></td></tr><tr><th colspan="2" style="background: #f0f0f1; padding: 15px;"><h2><?php echo esc_html__('Signal', 'service-bookings-events'); ?></h2></th></tr><tr><th><?php echo esc_html__('Enable Signal', 'service-bookings-events'); ?></th><td><label><input type="checkbox" name="sbe_signal_enabled" value="1" <?php checked($signal_enabled); ?>> <?php echo esc_html__('Send reminders via Signal', 'service-bookings-events'); ?></label></td></tr><tr><th><?php echo esc_html__('Account Number', 'service-bookings-events'); ?></th><td><input type="text" name="sbe_signal_account_number" value="<?php echo esc_attr($signal_number); ?>" class="regular-text" placeholder="+1234567890"></td></tr><tr><th><?php echo esc_html__('API Key', 'service-bookings-events'); ?></th><td><input type="password" name="sbe_signal_api_key" value="<?php echo esc_attr($signal_key); ?>" class="regular-text"></td></tr></table><?php submit_button(__('Save Messaging Settings', 'service-bookings-events'), 'primary', 'sbe_save_messaging'); ?></form><div style="margin-top: 30px; max-width: 700px;"><h2><?php echo esc_html__('Setup Instructions', 'service-bookings-events'); ?></h2><h3><?php echo esc_html__('WhatsApp (Twilio)', 'service-bookings-events'); ?></h3><ol><li><?php echo esc_html__('Go to', 'service-bookings-events'); ?> <a href="https://www.twilio.com/try-twilio" target="_blank"><?php echo esc_html__('Twilio', 'service-bookings-events'); ?></a></li><li><?php echo esc_html__('Create an account and get your Account SID and Auth Token', 'service-bookings-events'); ?></li><li><?php echo esc_html__('Enable WhatsApp sender and get a WhatsApp-enabled number', 'service-bookings-events'); ?></li></ol><h3><?php echo esc_html__('Telegram', 'service-bookings-events'); ?></h3><ol><li><?php echo esc_html__('Message', 'service-bookings-events'); ?> <a href="https://t.me/botfather" target="_blank"><?php echo esc_html__('@BotFather', 'service-bookings-events'); ?></a> <?php echo esc_html__('on Telegram', 'service-bookings-events'); ?></li><li><?php echo esc_html__('Create a new bot and get the bot token', 'service-bookings-events'); ?></li><li><?php echo esc_html__('Staff must message your bot first to start receiving notifications', 'service-bookings-events'); ?></li></ol><h3><?php echo esc_html__('Signal', 'service-bookings-events'); ?></h3><ol><li><?php echo esc_html__('Use a Signal gateway service like', 'service-bookings-events'); ?> <a href="https://signal-api.org/" target="_blank"><?php echo esc_html__('Signal API', 'service-bookings-events'); ?></a></li><li><?php echo esc_html__('Register a Signal number and get your API key', 'service-bookings-events'); ?></li></ol></div></div><?php
     }
     public function payment_gateway_page() {
         if (isset($_POST['sbe_save_payments']) && wp_verify_nonce($_POST['sbe_payments_nonce'], 'sbe_save_payments')) {
@@ -204,7 +342,7 @@ class Service_Bookings_Events {
     public function bookings_page() {
         global $wpdb;
         $bookings = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}sbe_bookings ORDER BY created_at DESC");
-        ?><div class="wrap"><h1><?php echo esc_html__('All Bookings', 'service-bookings-events'); ?></h1><table class="wp-list-table widefat fixed striped"><thead><tr><th><?php echo esc_html__('ID', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Customer', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Service/Event', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Host', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Price', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Date & Time', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Duration', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Status', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Payment', 'service-bookings-events'); ?></th></tr></thead><tbody><?php if (empty($bookings)): ?><tr><td colspan="9"><?php echo esc_html__('No bookings found.', 'service-bookings-events'); ?></td></tr><?php else: ?><?php foreach ($bookings as $booking): ?><tr><td>#<?php echo esc_html($booking->id); ?></td><td><?php echo esc_html($booking->customer_name); ?><br><small><?php echo esc_html($booking->customer_email); ?></small></td><td><?php $service = get_post($booking->service_id); echo $service ? esc_html($service->post_title) : 'N/A'; ?></td><td><?php echo $booking->host_name ? esc_html($booking->host_name) : '-'; ?></td><td><?php echo $booking->price > 0 ? esc_html(number_format($booking->price, 2)) : '-'; ?></td><td><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($booking->booking_date)) . ' ' . date_i18n(get_option('time_format'), strtotime($booking->booking_time))); ?></td><td><?php echo esc_html($booking->duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></td><td><span class="sbe-status sbe-status-<?php echo esc_attr($booking->status); ?>"><?php echo esc_html(ucfirst($booking->status)); ?></span></td><td><?php if ($booking->payment_status === 'paid'): ?><span style="color: #46b450;"><?php echo esc_html__('Paid'); ?></span><?php elseif ($booking->payment_status): ?><?php echo esc_html(ucfirst($booking->payment_status)); ?><?php else: ?>-<?php endif; ?></td></tr><?php endforeach; ?><?php endif; ?></tbody></table></div><?php
+        ?><div class="wrap"><h1><?php echo esc_html__('All Bookings', 'service-bookings-events'); ?></h1><table class="wp-list-table widefat fixed striped"><thead><tr><th><?php echo esc_html__('ID', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Customer', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Service/Event', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Staff', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Host', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Price', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Date & Time', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Duration', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Status', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Payment', 'service-bookings-events'); ?></th><th><?php echo esc_html__('Reminder', 'service-bookings-events'); ?></th></tr></thead><tbody><?php if (empty($bookings)): ?><tr><td colspan="11"><?php echo esc_html__('No bookings found.', 'service-bookings-events'); ?></td></tr><?php else: ?><?php foreach ($bookings as $booking): ?><tr><td>#<?php echo esc_html($booking->id); ?></td><td><?php echo esc_html($booking->customer_name); ?><br><small><?php echo esc_html($booking->customer_email); ?></small></td><td><?php $service = get_post($booking->service_id); echo $service ? esc_html($service->post_title) : 'N/A'; ?></td><td><?php if ($booking->staff_id): $staff = get_post($booking->staff_id); echo $staff ? esc_html($staff->post_title) : ''; else echo '-'; endif; ?></td><td><?php echo $booking->host_name ? esc_html($booking->host_name) : '-'; ?></td><td><?php echo $booking->price > 0 ? esc_html(number_format($booking->price, 2)) : '-'; ?></td><td><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($booking->booking_date)) . ' ' . date_i18n(get_option('time_format'), strtotime($booking->booking_time))); ?></td><td><?php echo esc_html($booking->duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></td><td><span class="sbe-status sbe-status-<?php echo esc_attr($booking->status); ?>"><?php echo esc_html(ucfirst($booking->status)); ?></span></td><td><?php if ($booking->payment_status === 'paid'): ?><span style="color: #46b450;"><?php echo esc_html__('Paid'); ?></span><?php elseif ($booking->payment_status): ?><?php echo esc_html(ucfirst($booking->payment_status)); ?><?php else: ?>-<?php endif; ?></td><td><?php echo $booking->reminder_sent ? '<span style="color: #46b450;">✓ ' . esc_html__('Sent', 'service-bookings-events') . '</span>' : '<span style="color: #999;">' . esc_html__('Pending', 'service-bookings-events') . '</span>'; ?></td></tr><?php endforeach; ?><?php endif; ?></tbody></table></div><?php
     }
     public function admin_enqueue_scripts($hook) { if (strpos($hook, 'sbe-') === false) return; wp_enqueue_style('sbe-admin', SBE_PLUGIN_URL . 'assets/css/admin.css', array(), SBE_VERSION); wp_enqueue_script('sbe-admin', SBE_PLUGIN_URL . 'assets/js/admin.js', array('jquery'), SBE_VERSION, true); }
     public function frontend_enqueue_scripts() { wp_enqueue_style('sbe-frontend', SBE_PLUGIN_URL . 'assets/css/frontend.css', array(), SBE_VERSION); wp_enqueue_script('sbe-frontend', SBE_PLUGIN_URL . 'assets/js/frontend.js', array('jquery'), SBE_VERSION, true); wp_localize_script('sbe-frontend', 'sbe_ajax', array('ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('sbe_booking_nonce'))); }
@@ -224,9 +362,10 @@ class Service_Bookings_Events {
         if (!$price && $event_id) $price = get_post_meta($event_id, '_sbe_price', true);
         $host_name = get_post_meta($service_id, '_sbe_host', true);
         if (!$host_name && $event_id) $host_name = get_post_meta($event_id, '_sbe_host', true);
+        $staff_id = get_post_meta($service_id, '_sbe_staff_id', true);
         if (empty($customer_name) || empty($customer_email) || empty($booking_date) || empty($booking_time)) { wp_send_json_error(array('message' => __('Please fill in all required fields.', 'service-bookings-events'))); }
         global $wpdb;
-        $result = $wpdb->insert($wpdb->prefix . 'sbe_bookings', array('service_id' => $service_id, 'event_id' => $event_id, 'customer_name' => $customer_name, 'customer_email' => $customer_email, 'customer_phone' => $customer_phone, 'booking_date' => $booking_date, 'booking_time' => $booking_time, 'duration' => $duration, 'price' => $price ? $price : 0, 'host_name' => $host_name, 'status' => 'pending', 'notes' => $notes), array('%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%f', '%s', '%s'));
+        $result = $wpdb->insert($wpdb->prefix . 'sbe_bookings', array('service_id' => $service_id, 'event_id' => $event_id, 'staff_id' => $staff_id, 'customer_name' => $customer_name, 'customer_email' => $customer_email, 'customer_phone' => $customer_phone, 'booking_date' => $booking_date, 'booking_time' => $booking_time, 'duration' => $duration, 'price' => $price ? $price : 0, 'host_name' => $host_name, 'status' => 'pending', 'notes' => $notes), array('%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%f', '%s', '%s'));
         if ($result === false) { wp_send_json_error(array('message' => __('Failed to create booking.', 'service-bookings-events'))); }
         $booking_id = $wpdb->insert_id;
         if (get_option('sbe_confirmation_email_enabled', true)) { $this->send_confirmation_email($booking_id); }
@@ -275,6 +414,18 @@ class Service_Bookings_Events {
         ?><div class="sbe-services <?php echo esc_attr($layout_class); ?>"><div class="sbe-services-inner"><?php foreach ($services as $service): ?><div class="sbe-service-card"><?php if (has_post_thumbnail($service->ID)): ?><div class="sbe-service-thumbnail"><?php echo get_the_post_thumbnail($service->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-service-content"><h3 class="sbe-service-title"><a href="<?php echo get_permalink($service->ID); ?>"><?php echo esc_html($service->post_title); ?></a></h3><?php $host = get_post_meta($service->ID, '_sbe_host', true); $duration = get_post_meta($service->ID, '_sbe_duration', true); $price = get_post_meta($service->ID, '_sbe_price', true); if (!$duration) $duration = get_option('sbe_default_booking_duration', 60); if ($price > 0 || $host || $duration): ?><p class="sbe-service-meta"><?php if ($price > 0): ?><span class="sbe-price"><?php echo esc_html(number_format($price, 2)); ?></span><?php endif; ?><?php if ($duration): ?><span class="sbe-duration"><?php echo esc_html($duration); ?> <?php echo esc_html__('min', 'service-bookings-events'); ?></span><?php endif; ?><?php if ($host): ?><span class="sbe-host"><?php echo esc_html__('with', 'service-bookings-events'); ?> <?php echo esc_html($host); ?></span><?php endif; ?></p><?php endif; ?><?php if (has_excerpt($service->ID)): ?><div class="sbe-service-excerpt"><?php echo esc_html(get_the_excerpt($service->ID)); ?></div><?php endif; ?><?php if ($booking_page_id): ?><a href="<?php echo esc_url(add_query_arg('service', $service->ID, $booking_url)); ?>" class="sbe-service-link button"><?php echo esc_html__('Book Now', 'service-bookings-events'); ?></a><?php else: ?><a href="<?php echo get_permalink($service->ID); ?>" class="sbe-service-link button"><?php echo esc_html__('Learn More', 'service-bookings-events'); ?></a><?php endif; ?></div></div><?php endforeach; ?></div></div><?php
         return ob_get_clean();
     }
+    public function staff_list_shortcode($atts) {
+        $atts = shortcode_atts(array('category' => '', 'limit' => -1, 'layout' => 'grid'), $atts);
+        $args = array('post_type' => 'sbe_staff', 'posts_per_page' => intval($atts['limit']), 'post_status' => 'publish');
+        if (!empty($atts['category'])) {
+            $args['tax_query'] = array(array('taxonomy' => 'sbe_staff_category', 'field' => 'slug', 'terms' => $atts['category']));
+        }
+        $staff_members = get_posts($args);
+        $layout_class = $atts['layout'] === 'list' ? 'sbe-staff-list' : 'sbe-staff-grid';
+        ob_start();
+        ?><div class="sbe-staff <?php echo esc_attr($layout_class); ?>"><div class="sbe-staff-inner"><?php foreach ($staff_members as $staff): $email = get_post_meta($staff->ID, '_sbe_staff_email', true); $phone = get_post_meta($staff->ID, '_sbe_staff_phone', true); $bio = get_post_meta($staff->ID, '_sbe_staff_bio', true); $profile_link = get_post_meta($staff->ID, '_sbe_staff_profile_link', true); if (empty($profile_link)) $profile_link = get_permalink($staff->ID); ?><div class="sbe-staff-card"><?php if (has_post_thumbnail($staff->ID)): ?><div class="sbe-staff-thumbnail"><?php echo get_the_post_thumbnail($staff->ID, 'medium'); ?></div><?php endif; ?><div class="sbe-staff-content"><h3 class="sbe-staff-name"><a href="<?php echo esc_url($profile_link); ?>"><?php echo esc_html($staff->post_title); ?></a></h3><?php if ($bio): ?><div class="sbe-staff-bio"><?php echo esc_html($bio); ?></div><?php endif; ?><?php if ($email || $phone): ?><p class="sbe-staff-contact"><?php if ($email): ?><span class="sbe-staff-email"><?php echo esc_html($email); ?></span><?php endif; ?><?php if ($phone): ?><span class="sbe-staff-phone"><?php echo esc_html($phone); ?></span><?php endif; ?></p><?php endif; ?><a href="<?php echo esc_url($profile_link); ?>" class="sbe-staff-link button"><?php echo esc_html__('View Profile', 'service-bookings-events'); ?></a></div></div><?php endforeach; ?></div></div><?php
+        return ob_get_clean();
+    }
     public function calendar_shortcode($atts) {
         $atts = shortcode_atts(array('type' => 'both', 'view' => 'month'), $atts);
         ob_start();
@@ -305,6 +456,100 @@ class Service_Bookings_Events {
         }
         echo "END:VCALENDAR";
         exit;
+    }
+    public function send_booking_reminders() {
+        global $wpdb;
+        $hours_before = get_option('sbe_reminder_hours_before', 24);
+        $cutoff_time = date('Y-m-d H:i:s', strtotime("+{$hours_before} hours"));
+        $bookings = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}sbe_bookings WHERE staff_id > 0 AND reminder_sent = 0 AND booking_date <= %s AND status IN ('pending', 'confirmed')", date('Y-m-d', strtotime($cutoff_time))));
+        foreach ($bookings as $booking) {
+            $staff = get_post($booking->staff_id);
+            if (!$staff) continue;
+            $platform = get_post_meta($staff->ID, '_sbe_messaging_platform', true);
+            $messaging_id = get_post_meta($staff->ID, '_sbe_messaging_id', true);
+            $send_reminders = get_post_meta($staff->ID, '_sbe_send_reminders', true);
+            if (!$send_reminders || empty($messaging_id)) continue;
+            $service = get_post($booking->service_id);
+            $message = sprintf(
+                "🔔 Booking Reminder\n\n" .
+                "Customer: %s\n" .
+                "Service: %s\n" .
+                "Date: %s at %s\n" .
+                "Duration: %d minutes\n" .
+                "Notes: %s",
+                $booking->customer_name,
+                $service ? $service->post_title : 'N/A',
+                date_i18n(get_option('date_format'), strtotime($booking->booking_date)),
+                date_i18n(get_option('time_format'), strtotime($booking->booking_time)),
+                $booking->duration,
+                $booking->notes ?: 'None'
+            );
+            $sent = false;
+            if ($platform === 'whatsapp' && get_option('sbe_whatsapp_enabled')) {
+                $sent = $this->send_whatsapp_message($messaging_id, $message);
+            } elseif ($platform === 'telegram' && get_option('sbe_telegram_enabled')) {
+                $sent = $this->send_telegram_message($messaging_id, $message);
+            } elseif ($platform === 'signal' && get_option('sbe_signal_enabled')) {
+                $sent = $this->send_signal_message($messaging_id, $message);
+            }
+            if ($sent) {
+                $wpdb->update($wpdb->prefix . 'sbe_bookings', array('reminder_sent' => 1), array('id' => $booking->id), array('%d'), array('%d'));
+            }
+        }
+    }
+    private function send_whatsapp_message($to, $message) {
+        $account_sid = get_option('sbe_whatsapp_account_sid');
+        $auth_token = get_option('sbe_whatsapp_auth_token');
+        $from_number = get_option('sbe_whatsapp_from_number');
+        if (empty($account_sid) || empty($auth_token) || empty($from_number)) return false;
+        $url = "https://api.twilio.com/2010-04-01/Accounts/{$account_sid}/Messages.json";
+        $data = array(
+            'From' => 'whatsapp:' . $from_number,
+            'To' => 'whatsapp:' . $to,
+            'Body' => $message
+        );
+        $response = wp_remote_post($url, array(
+            'headers' => array('Authorization' => 'Basic ' . base64_encode($account_sid . ':' . $auth_token)),
+            'body' => $data,
+            'timeout' => 15
+        ));
+        return !is_wp_error($response) && wp_remote_retrieve_response_code($response) === 201;
+    }
+    private function send_telegram_message($chat_id, $message) {
+        $bot_token = get_option('sbe_telegram_bot_token');
+        if (empty($bot_token)) return false;
+        $url = "https://api.telegram.org/bot{$bot_token}/sendMessage";
+        $data = array(
+            'chat_id' => $chat_id,
+            'text' => $message,
+            'parse_mode' => 'HTML'
+        );
+        $response = wp_remote_post($url, array(
+            'body' => json_encode($data),
+            'headers' => array('Content-Type' => 'application/json'),
+            'timeout' => 15
+        ));
+        return !is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200;
+    }
+    private function send_signal_message($to, $message) {
+        $account_number = get_option('sbe_signal_account_number');
+        $api_key = get_option('sbe_signal_api_key');
+        if (empty($account_number) || empty($api_key)) return false;
+        $url = "https://api.signal-api.org/v1/send";
+        $data = array(
+            'from' => $account_number,
+            'to' => $to,
+            'message' => $message
+        );
+        $response = wp_remote_post($url, array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $api_key
+            ),
+            'body' => json_encode($data),
+            'timeout' => 15
+        ));
+        return !is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200;
     }
     private function send_confirmation_email($booking_id) {
         global $wpdb;
