@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Service Bookings & Events
  * Description: Complete booking system with payments (Stripe/PayPal), subscriptions, recurring billing, and calendar feeds (iCal/Google Calendar)
- * Version: 2.0.0
+ * Version: 2.0.1
  * Author: Your Name
  * License: GPL v2 or later
  * Text Domain: service-bookings-events
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('SBE_VERSION', '2.0.0');
+define('SBE_VERSION', '2.0.1');
 define('SBE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SBE_PLUGIN_URL', plugin_dir_url(__FILE__));
 
